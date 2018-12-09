@@ -18,10 +18,7 @@ module.exports = ({
 		return min + seed / 4294967296 * (max - min);
 	};
 
-	const pad = function(s, size) {
-	    let l = size - s.length;
-	    return `${l ? `0`.repeat(l) : ``}${s}`;
-	}
+ 	const pad = (s, size) => s.padStart(size, `0`);
 
 	let getHash = str => parseInt(sha512(str).slice(0, 7), 16);
 
