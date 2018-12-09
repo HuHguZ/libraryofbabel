@@ -1,7 +1,7 @@
 let sha512 = require(`js-sha512`);
 
 module.exports = ({
-	lengthOfPage = 4813, 
+	lengthOfPage = 4819, 
 	lengthOfTitle = 31, 
 	digs = '0123456789abcdefghijklmnopqrstuvwxyz', 
 	alphabet = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя, .',
