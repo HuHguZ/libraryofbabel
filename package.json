@@ -1,0 +1,18 @@
+{
+  "name": "babel",
+  "version": "1.0.0",
+  "description": "Javascript Implementation of the Library Of Babel",
+  "main": "index.js",
+  "dependencies": {
+    "js-sha512": "^0.8.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "library"
+  ],
+  "author": "HuHguZ",
+  "license": "ISC"
+}
