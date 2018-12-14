@@ -1,3 +1,4 @@
+//https://vk.com/huhguz - связь со мной
 let sha512 = require(`js-sha512`);
 
 module.exports = ({
