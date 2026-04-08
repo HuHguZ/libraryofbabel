@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a0a2e"/>
+      <stop offset="50%" stop-color="#16213e"/>
+      <stop offset="100%" stop-color="#0f3460"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d070"/>
+      <stop offset="50%" stop-color="#d4a843"/>
+      <stop offset="100%" stop-color="#c9952a"/>
+    </linearGradient>
+    <linearGradient id="goldLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f7e09e"/>
+      <stop offset="100%" stop-color="#d4a843"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#f5d070" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#f5d070" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background hexagon -->
+  <polygon points="256,28 462,148 462,364 256,484 50,364 50,148" fill="url(#bg)" stroke="url(#gold)" stroke-width="8"/>
+
+  <!-- Inner hexagon outline -->
+  <polygon points="256,80 410,172 410,340 256,432 102,340 102,172" fill="none" stroke="url(#gold)" stroke-width="2.5" opacity="0.4"/>
+
+  <!-- Radiating lines from center (library corridors) -->
+  <g stroke="url(#gold)" stroke-width="1.5" opacity="0.25">
+    <line x1="256" y1="256" x2="256" y2="80"/>
+    <line x1="256" y1="256" x2="410" y2="172"/>
+    <line x1="256" y1="256" x2="410" y2="340"/>
+    <line x1="256" y1="256" x2="256" y2="432"/>
+    <line x1="256" y1="256" x2="102" y2="340"/>
+    <line x1="256" y1="256" x2="102" y2="172"/>
+  </g>
+
+  <!-- Center book symbol -->
+  <!-- Left page -->
+  <path d="M218,210 L218,320 Q256,295 256,295 L256,185 Q238,195 218,210Z" fill="url(#goldLight)" opacity="0.9"/>
+  <!-- Right page -->
+  <path d="M294,210 L294,320 Q256,295 256,295 L256,185 Q274,195 294,210Z" fill="url(#gold)" opacity="0.9"/>
+  <!-- Page lines left -->
+  <g stroke="#1a0a2e" stroke-width="1.2" opacity="0.3">
+    <line x1="228" y1="225" x2="252" y2="210"/>
+    <line x1="228" y1="242" x2="252" y2="227"/>
+    <line x1="228" y1="259" x2="252" y2="244"/>
+    <line x1="228" y1="276" x2="252" y2="261"/>
+    <line x1="228" y1="293" x2="252" y2="278"/>
+  </g>
+  <!-- Page lines right -->
+  <g stroke="#1a0a2e" stroke-width="1.2" opacity="0.3">
+    <line x1="260" y1="210" x2="284" y2="225"/>
+    <line x1="260" y1="227" x2="284" y2="242"/>
+    <line x1="260" y1="244" x2="284" y2="259"/>
+    <line x1="260" y1="261" x2="284" y2="276"/>
+    <line x1="260" y1="278" x2="284" y2="293"/>
+  </g>
+
+  <!-- Infinity symbol above the book -->
+  <path d="M216,165 C216,145 236,135 256,155 C276,135 296,145 296,165 C296,185 276,195 256,175 C236,195 216,185 216,165Z" fill="none" stroke="url(#gold)" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Small decorative dots at hexagon vertices -->
+  <g fill="#f5d070" opacity="0.7">
+    <circle cx="256" cy="80" r="4"/>
+    <circle cx="410" cy="172" r="4"/>
+    <circle cx="410" cy="340" r="4"/>
+    <circle cx="256" cy="432" r="4"/>
+    <circle cx="102" cy="340" r="4"/>
+    <circle cx="102" cy="172" r="4"/>
+  </g>
+
+  <!-- Subtle glow in center -->
+  <circle cx="256" cy="256" r="90" fill="url(#glow)" opacity="0.3"/>
+
+  <!-- Tiny stars scattered -->
+  <g fill="#f5d070" opacity="0.5">
+    <circle cx="160" cy="130" r="2"/>
+    <circle cx="350" cy="120" r="1.5"/>
+    <circle cx="380" cy="280" r="2"/>
+    <circle cx="140" cy="300" r="1.5"/>
+    <circle cx="300" cy="400" r="1.5"/>
+    <circle cx="200" cy="390" r="2"/>
+    <circle cx="180" cy="220" r="1.5"/>
+    <circle cx="340" cy="230" r="1.5"/>
+  </g>
+</svg>
