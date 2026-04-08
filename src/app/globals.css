@@ -1,0 +1,87 @@
+/* ===== LIBRARY OF BABEL — GLOBAL STYLES ===== */
+
+/* Noise grain overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Ambient light glow */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 30%, rgba(201, 168, 76, 0.04) 0%, transparent 100%),
+    radial-gradient(ellipse 50% 60% at 80% 70%, rgba(201, 168, 76, 0.03) 0%, transparent 100%),
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(201, 168, 76, 0.025) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===== GLOW LINE ===== */
+
+.glow-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 168, 76, 0.5) 30%, rgba(201, 168, 76, 0.5) 70%, transparent);
+  position: relative;
+}
+
+.glow-line::after {
+  content: '';
+  position: absolute;
+  inset: -2px 20% -2px 20%;
+  background: linear-gradient(90deg, transparent, rgba(201, 168, 76, 0.15), transparent);
+  filter: blur(4px);
+}
+
+/* ===== SCROLLBAR ===== */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #08080f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(201, 168, 76, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 168, 76, 0.35);
+}
+
+/* ===== SELECTION ===== */
+
+::selection {
+  background: rgba(201, 168, 76, 0.3);
+  color: #f0e4c9;
+}
+
+/* ===== FOCUS ===== */
+
+*:focus-visible {
+  outline: 1px solid rgba(201, 168, 76, 0.5);
+  outline-offset: 2px;
+}
+
+/* ===== HEXAGON PATTERN (very subtle) ===== */
+
+.hex-pattern {
+  position: fixed;
+  inset: 0;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='52' viewBox='0 0 60 52' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 15v22L30 52 0 37V15z' fill='none' stroke='%23c9a84c' stroke-width='0.5'/%3E%3C/svg%3E");
+  background-size: 60px 52px;
+  pointer-events: none;
+  z-index: 0;
+}

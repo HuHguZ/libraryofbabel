@@ -1,12 +1,22 @@
 import type { Metadata } from "next";
-import { Playfair_Display } from "next/font/google";
+import { Cormorant_Garamond, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import FloatingParticles from "@/components/FloatingParticles";
+import "./globals.css";
 
-const playfair = Playfair_Display({
+const cormorant = Cormorant_Garamond({
   subsets: ["cyrillic", "latin"],
-  variable: "--font-playfair",
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-cormorant",
+  display: "swap",
+});
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["cyrillic", "latin"],
+  weight: ["300", "400", "500"],
+  variable: "--font-jetbrains",
   display: "swap",
 });
 
@@ -22,18 +32,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ru" className={playfair.variable}>
+    <html lang="ru" className={`${cormorant.variable} ${jetbrains.variable}`}>
       <body
         style={{
           margin: 0,
-          backgroundColor: "var(--chakra-colors-dark-800)",
+          backgroundColor: "#08080f",
           minHeight: "100vh",
+          position: "relative",
         }}
       >
         <Providers>
-          <Header />
-          <main style={{ minHeight: "calc(100vh - 130px)" }}>{children}</main>
-          <Footer />
+          <div className="hex-pattern" />
+          <FloatingParticles count={10} />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <Header />
+            <main style={{ minHeight: "calc(100vh - 130px)" }}>{children}</main>
+            <Footer />
+          </div>
         </Providers>
       </body>
     </html>

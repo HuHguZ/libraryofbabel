@@ -1,21 +1,37 @@
 "use client";
 
 import { Box, Text } from "@chakra-ui/react";
+import { motion } from "framer-motion";
+import AnimatedOrnament from "@/components/AnimatedOrnament";
+import { fadeIn } from "@/lib/animations";
+
+const MotionBox = motion.create(Box);
 
 export default function Footer() {
   return (
-    <Box
+    <MotionBox
       as="footer"
-      bg="dark.900"
-      borderTop="1px solid"
-      borderColor="brand.400/20"
       px={6}
-      py={4}
+      py={6}
       textAlign="center"
+      variants={fadeIn}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true }}
     >
-      <Text color="dark.300" fontSize="sm">
+      <Box mb={4}>
+        <AnimatedOrnament />
+      </Box>
+      <Text
+        color="dark.300"
+        fontSize="xs"
+        fontFamily="var(--font-cormorant), Georgia, serif"
+        fontStyle="italic"
+        fontWeight="400"
+        letterSpacing="0.05em"
+      >
         По мотивам рассказа Хорхе Луиса Борхеса «Вавилонская библиотека» (1941)
       </Text>
-    </Box>
+    </MotionBox>
   );
 }
