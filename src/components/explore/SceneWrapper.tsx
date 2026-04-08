@@ -2,8 +2,9 @@
 
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { Box } from "@chakra-ui/react";
-import { ReactNode, Suspense } from "react";
+import { Box, Text } from "@chakra-ui/react";
+import { motion } from "framer-motion";
+import { ReactNode, Suspense, useState } from "react";
 
 interface SceneWrapperProps {
   children: ReactNode;
@@ -13,6 +14,13 @@ interface SceneWrapperProps {
   height?: Record<string, string> | string;
 }
 
+function SceneReadyDetector({ onReady }: { onReady: () => void }) {
+  useState(() => {
+    onReady();
+  });
+  return null;
+}
+
 export default function SceneWrapper({
   children,
   cameraPosition = [0, 2, 8],
@@ -20,6 +28,8 @@ export default function SceneWrapper({
   autoRotateSpeed = 0.3,
   height,
 }: SceneWrapperProps) {
+  const [ready, setReady] = useState(false);
+
   return (
     <Box
       w="100%"
@@ -31,6 +41,33 @@ export default function SceneWrapper({
       bg="dark.900"
       position="relative"
     >
+      {/* Loading overlay — shown until scene children mount */}
+      {!ready && (
+        <Box
+          position="absolute"
+          inset={0}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          zIndex={2}
+          bg="dark.900"
+        >
+          <motion.div
+            animate={{ opacity: [0.3, 0.8, 0.3] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Text
+              color="dark.300"
+              fontSize="xs"
+              fontFamily="var(--font-cormorant), Georgia, serif"
+              fontStyle="italic"
+            >
+              Загрузка 3D...
+            </Text>
+          </motion.div>
+        </Box>
+      )}
+
       <Canvas
         camera={{ position: cameraPosition, fov: 50 }}
         gl={{ antialias: true, alpha: true }}
@@ -57,6 +94,8 @@ export default function SceneWrapper({
           <fog attach="fog" args={["#08080f", 8, 25]} />
 
           {children}
+
+          <SceneReadyDetector onReady={() => setReady(true)} />
 
           <OrbitControls
             autoRotate={autoRotate}

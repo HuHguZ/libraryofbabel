@@ -99,27 +99,29 @@ function BookVolume({
 export default function BookshelfScene({ wall, shelf, onVolumeClick }: BookshelfSceneProps) {
   const volumes = 31;
 
-  // Arrange books in rows on shelves
-  const booksPerRow = 11;
-  const rows = Math.ceil(volumes / booksPerRow);
-
   const bookColors = [
     "#2a1f0e", "#1a2a1a", "#1a1a2e", "#2e1a1a", "#2a2a1a",
     "#1a2e2a", "#2e1a2a", "#1e1e1e", "#2a1a1a", "#1a2a2a",
     "#25200f", "#1f251f", "#1f1f29", "#291f1f", "#25251f",
   ];
 
+  // Single row — all 31 books on one shelf
+  const bookSpacing = 0.3;
+  const totalWidth = volumes * bookSpacing;
+  const startX = -totalWidth / 2;
+  const shelfY = -0.3;
+
   return (
     <group>
       {/* Back wall */}
       <mesh position={[0, 0, -0.5]}>
-        <planeGeometry args={[8, 5]} />
+        <planeGeometry args={[totalWidth + 2, 3]} />
         <meshStandardMaterial color="#111119" side={THREE.DoubleSide} />
       </mesh>
 
       {/* Shelf label */}
       <Text
-        position={[0, 2.2, 0]}
+        position={[0, 1.2, 0]}
         fontSize={0.18}
         color="#c9a84c"
         anchorX="center"
@@ -129,57 +131,45 @@ export default function BookshelfScene({ wall, shelf, onVolumeClick }: Bookshelf
       </Text>
 
       {/* Decorative line under label */}
-      <mesh position={[0, 2.05, 0]}>
+      <mesh position={[0, 1.05, 0]}>
         <planeGeometry args={[2.5, 0.005]} />
         <meshBasicMaterial color="#c9a84c" transparent opacity={0.4} />
       </mesh>
 
-      {/* Book rows */}
-      {Array.from({ length: rows }, (_, row) => {
-        const booksInRow = row === rows - 1 ? volumes - row * booksPerRow : booksPerRow;
-        const rowY = 1.2 - row * 1.3;
-        const totalWidth = booksInRow * 0.35;
-        const startX = -totalWidth / 2;
+      {/* Single shelf plank */}
+      <mesh position={[0, shelfY, 0]}>
+        <boxGeometry args={[totalWidth + 1, 0.08, 0.8]} />
+        <meshStandardMaterial color="#3a2e1a" roughness={0.9} />
+      </mesh>
+
+      {/* All books in a single row */}
+      {Array.from({ length: volumes }, (_, i) => {
+        const volNum = i + 1;
+        const bookWidth = 0.18 + Math.sin(volNum * 1.7) * 0.04;
+        const bookHeight = 0.6 + Math.sin(volNum * 2.3) * 0.12;
+        const bookX = startX + i * bookSpacing + bookSpacing / 2;
+        const bookColor = bookColors[volNum % bookColors.length];
 
         return (
-          <group key={row}>
-            {/* Shelf plank */}
-            <mesh position={[0, rowY - 0.55, 0]}>
-              <boxGeometry args={[6, 0.08, 0.8]} />
-              <meshStandardMaterial color="#3a2e1a" roughness={0.9} />
-            </mesh>
-
-            {/* Books in this row */}
-            {Array.from({ length: booksInRow }, (_, i) => {
-              const volNum = row * booksPerRow + i + 1;
-              const bookWidth = 0.2 + Math.sin(volNum * 1.7) * 0.06;
-              const bookHeight = 0.7 + Math.sin(volNum * 2.3) * 0.15;
-              const bookX = startX + i * 0.35 + bookWidth / 2;
-              const bookColor = bookColors[volNum % bookColors.length];
-
-              return (
-                <BookVolume
-                  key={volNum}
-                  volumeNumber={volNum}
-                  position={[bookX, rowY - 0.15 + bookHeight / 2 - 0.35, 0]}
-                  height={bookHeight}
-                  width={bookWidth}
-                  color={bookColor}
-                  onClick={() => onVolumeClick(volNum)}
-                />
-              );
-            })}
-          </group>
+          <BookVolume
+            key={volNum}
+            volumeNumber={volNum}
+            position={[bookX, shelfY + 0.04 + bookHeight / 2, 0]}
+            height={bookHeight}
+            width={bookWidth}
+            color={bookColor}
+            onClick={() => onVolumeClick(volNum)}
+          />
         );
       })}
 
       {/* Side panels */}
-      <mesh position={[-3.5, 0, 0]}>
-        <boxGeometry args={[0.1, 5, 0.8]} />
+      <mesh position={[-(totalWidth / 2 + 0.6), 0, 0]}>
+        <boxGeometry args={[0.1, 3, 0.8]} />
         <meshStandardMaterial color="#2a1f0e" />
       </mesh>
-      <mesh position={[3.5, 0, 0]}>
-        <boxGeometry args={[0.1, 5, 0.8]} />
+      <mesh position={[(totalWidth / 2 + 0.6), 0, 0]}>
+        <boxGeometry args={[0.1, 3, 0.8]} />
         <meshStandardMaterial color="#2a1f0e" />
       </mesh>
     </group>

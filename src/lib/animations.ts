@@ -190,3 +190,49 @@ export const letter: Variants = {
     transition: { duration: 0.3, ease: "easeOut" },
   },
 };
+
+// === Scroll-triggered fade in up ===
+export const scrollFadeInUp: Variants = {
+  hidden: { opacity: 0, y: 40 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+// === Scroll-triggered scale reveal ===
+export const scrollScaleReveal: Variants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+// === Infinite slow rotate ===
+export const slowRotate: Variants = {
+  animate: {
+    rotate: 360,
+    transition: { duration: 120, repeat: Infinity, ease: "linear" },
+  },
+};
+
+// === Draw SVG path ===
+export const drawPath: Variants = {
+  hidden: { pathLength: 0, opacity: 0 },
+  visible: {
+    pathLength: 1,
+    opacity: 1,
+    transition: { duration: 2, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+// === Typewriter cursor blink ===
+export const cursorBlink: Variants = {
+  animate: {
+    opacity: [1, 0, 1],
+    transition: { duration: 1.2, repeat: Infinity, ease: "linear" },
+  },
+};
