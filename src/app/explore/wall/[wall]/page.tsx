@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Box, VStack, Text, Link as ChakraLink } from "@chakra-ui/react";
 import { motion } from "framer-motion";
@@ -32,6 +32,21 @@ export default function WallExplorePage() {
 
   const hexFromUrl = searchParams.get("hex");
   const [hex] = useState(() => hexFromUrl || generateRandomHex(4819));
+
+  // Camera inside the hex, looking at the active wall
+  const { cameraPosition, cameraTarget } = useMemo(() => {
+    const wallIndex = wall - 1; // 0-based
+    const angle = (wallIndex / 6) * Math.PI * 2 + Math.PI / 6;
+    const wallX = Math.cos(angle) * 4;
+    const wallZ = Math.sin(angle) * 4;
+    // Position camera on the opposite side of center from the wall, so the full wall is visible
+    const camX = -Math.cos(angle) * 1.2;
+    const camZ = -Math.sin(angle) * 1.2;
+    return {
+      cameraPosition: [camX, 0.5, camZ] as [number, number, number],
+      cameraTarget: [wallX, 0, wallZ] as [number, number, number],
+    };
+  }, [wall]);
 
   const handleShelfClick = (shelf: number) => {
     router.push(`/explore/wall/${wall}/shelf/${shelf}?hex=${encodeURIComponent(hex)}`);
@@ -104,7 +119,7 @@ export default function WallExplorePage() {
 
           {/* 3D Scene */}
           <MotionBox variants={fadeInUp}>
-            <SceneWrapper cameraPosition={[0, 1, 6]} autoRotateSpeed={0.2}>
+            <SceneWrapper cameraPosition={cameraPosition} cameraTarget={cameraTarget} autoRotate={false}>
               <HexGalleryScene activeWall={wall} onShelfClick={handleShelfClick} onVolumeClick={handleVolumeClick} />
             </SceneWrapper>
           </MotionBox>

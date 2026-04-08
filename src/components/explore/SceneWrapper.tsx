@@ -1,14 +1,16 @@
 "use client";
 
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { Box, Text } from "@chakra-ui/react";
 import { motion } from "framer-motion";
-import { ReactNode, Suspense, useState } from "react";
+import { ReactNode, Suspense, useState, useEffect, useRef } from "react";
+import * as THREE from "three";
 
 interface SceneWrapperProps {
   children: ReactNode;
   cameraPosition?: [number, number, number];
+  cameraTarget?: [number, number, number];
   autoRotate?: boolean;
   autoRotateSpeed?: number;
   height?: Record<string, string> | string;
@@ -21,14 +23,74 @@ function SceneReadyDetector({ onReady }: { onReady: () => void }) {
   return null;
 }
 
+function KeyboardMovement({ controlsRef }: { controlsRef: React.RefObject<typeof OrbitControls extends React.ForwardRefExoticComponent<infer P> ? (P extends { ref?: React.Ref<infer T> } ? T : never) : never> }) {
+  const { camera } = useThree();
+  const keys = useRef<Set<string>>(new Set());
+  const speed = 3;
+
+  const moveCodes = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (moveCodes.has(e.code)) {
+        e.preventDefault();
+        keys.current.add(e.code);
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      keys.current.delete(e.code);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, []);
+
+  useFrame((_, delta) => {
+    if (keys.current.size === 0) return;
+
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    const right = new THREE.Vector3();
+    right.crossVectors(forward, camera.up).normalize();
+
+    const move = new THREE.Vector3();
+
+    if (keys.current.has("KeyW") || keys.current.has("ArrowUp")) move.add(forward);
+    if (keys.current.has("KeyS") || keys.current.has("ArrowDown")) move.sub(forward);
+    if (keys.current.has("KeyD") || keys.current.has("ArrowRight")) move.add(right);
+    if (keys.current.has("KeyA") || keys.current.has("ArrowLeft")) move.sub(right);
+
+    if (move.lengthSq() === 0) return;
+    move.normalize().multiplyScalar(speed * delta);
+
+    camera.position.add(move);
+
+    // Keep OrbitControls target in sync
+    const controls = controlsRef.current as unknown as { target: THREE.Vector3 };
+    if (controls?.target) {
+      controls.target.add(move);
+    }
+  });
+
+  return null;
+}
+
 export default function SceneWrapper({
   children,
   cameraPosition = [0, 2, 8],
+  cameraTarget,
   autoRotate = true,
   autoRotateSpeed = 0.3,
   height,
 }: SceneWrapperProps) {
   const [ready, setReady] = useState(false);
+  const orbitRef = useRef<any>(null);
 
   return (
     <Box
@@ -97,7 +159,10 @@ export default function SceneWrapper({
 
           <SceneReadyDetector onReady={() => setReady(true)} />
 
+          <KeyboardMovement controlsRef={orbitRef} />
+
           <OrbitControls
+            ref={orbitRef}
             autoRotate={autoRotate}
             autoRotateSpeed={autoRotateSpeed}
             enableZoom={true}
@@ -106,6 +171,7 @@ export default function SceneWrapper({
             maxDistance={15}
             maxPolarAngle={Math.PI / 1.8}
             minPolarAngle={Math.PI / 6}
+            {...(cameraTarget ? { target: cameraTarget } : {})}
           />
         </Suspense>
       </Canvas>
