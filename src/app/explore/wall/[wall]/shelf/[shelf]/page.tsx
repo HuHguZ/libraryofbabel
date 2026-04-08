@@ -1,16 +1,24 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Box, VStack, Text, Link as ChakraLink } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import NextLink from "next/link";
 import PageTransition from "@/components/PageTransition";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
-import SceneWrapper from "@/components/explore/SceneWrapper";
-import BookshelfScene from "@/components/explore/BookshelfScene";
+import SceneLoadingFallback from "@/components/SceneLoadingFallback";
 import { fadeInUp, stagger, slideInLeft } from "@/lib/animations";
 import { generateRandomHex } from "@/lib/hex";
+
+const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), {
+  ssr: false,
+  loading: () => <SceneLoadingFallback />,
+});
+const BookshelfScene = dynamic(() => import("@/components/explore/BookshelfScene"), {
+  ssr: false,
+});
 
 const MotionBox = motion.create(Box);
 const MotionVStack = motion.create(VStack);
@@ -24,9 +32,8 @@ export default function ShelfExplorePage() {
   const wall = Math.max(1, Math.min(5, isNaN(rawWall) ? 1 : rawWall));
   const shelf = Math.max(1, Math.min(7, isNaN(rawShelf) ? 1 : rawShelf));
 
-  const hex = useMemo(() => {
-    return searchParams.get("hex") || generateRandomHex(4819);
-  }, [searchParams]);
+  const hexFromUrl = searchParams.get("hex");
+  const [hex] = useState(() => hexFromUrl || generateRandomHex(4819));
 
   const handleVolumeClick = (volume: number) => {
     router.push(`/explore/wall/${wall}/shelf/${shelf}/volume/${volume}?hex=${encodeURIComponent(hex)}`);
@@ -95,7 +102,7 @@ export default function ShelfExplorePage() {
 
           {/* 3D Scene */}
           <MotionBox variants={fadeInUp}>
-            <SceneWrapper cameraPosition={[0, 0.5, 5]} autoRotateSpeed={0.15}>
+            <SceneWrapper cameraPosition={[0, 0.5, 8]} autoRotateSpeed={0.15}>
               <BookshelfScene wall={wall} shelf={shelf} onVolumeClick={handleVolumeClick} />
             </SceneWrapper>
           </MotionBox>

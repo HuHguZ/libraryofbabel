@@ -1,16 +1,24 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Box, VStack, Text, Link as ChakraLink } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import NextLink from "next/link";
 import PageTransition from "@/components/PageTransition";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
-import SceneWrapper from "@/components/explore/SceneWrapper";
-import VolumeScene from "@/components/explore/VolumeScene";
+import SceneLoadingFallback from "@/components/SceneLoadingFallback";
 import { fadeInUp, stagger, slideInLeft } from "@/lib/animations";
 import { generateRandomHex } from "@/lib/hex";
+
+const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), {
+  ssr: false,
+  loading: () => <SceneLoadingFallback height={{ base: "65vh", md: "75vh" }} />,
+});
+const VolumeScene = dynamic(() => import("@/components/explore/VolumeScene"), {
+  ssr: false,
+});
 
 const MotionBox = motion.create(Box);
 const MotionVStack = motion.create(VStack);
@@ -26,9 +34,14 @@ export default function VolumeExplorePage() {
   const shelf = Math.max(1, Math.min(7, isNaN(rawShelf) ? 1 : rawShelf));
   const volume = Math.max(1, Math.min(31, isNaN(rawVolume) ? 1 : rawVolume));
 
-  const hex = useMemo(() => {
-    return searchParams.get("hex") || generateRandomHex(4819);
-  }, [searchParams]);
+  const hexFromUrl = searchParams.get("hex");
+  const [hex, setHex] = useState(hexFromUrl || "");
+
+  useEffect(() => {
+    if (!hexFromUrl) {
+      setHex(generateRandomHex(4819));
+    }
+  }, [hexFromUrl]);
 
   const handlePageClick = (page: number) => {
     const address = `${hex}-${wall}-${shelf}-${volume}-${page}`;

@@ -85,3 +85,35 @@ body::after {
   pointer-events: none;
   z-index: 0;
 }
+
+/* ===== HOMEPAGE ===== */
+
+/* Shimmer gradient text — non-animatable via FM (background-position) */
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    rgba(201, 168, 76, 0.6) 0%,
+    rgba(240, 228, 201, 1) 25%,
+    rgba(201, 168, 76, 0.8) 50%,
+    rgba(240, 228, 201, 1) 75%,
+    rgba(201, 168, 76, 0.6) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: goldenShimmer 6s linear infinite;
+}
+
+@keyframes goldenShimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Section divider — decorative, not motion */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 5%, rgba(201, 168, 76, 0.3) 30%, rgba(201, 168, 76, 0.5) 50%, rgba(201, 168, 76, 0.3) 70%, transparent 95%);
+  max-width: 600px;
+  margin: 0 auto;
+}

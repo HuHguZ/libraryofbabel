@@ -1,13 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import * as THREE from "three";
 
+const VOLUMES_PER_SHELF = 31;
+const BOOKS_WIDTH = 2.5;
+const BOOK_SPACING = BOOKS_WIDTH / VOLUMES_PER_SHELF;
+
 interface HexGallerySceneProps {
   activeWall: number;
   onShelfClick: (shelf: number) => void;
+  onVolumeClick: (shelf: number, volume: number) => void;
 }
 
 function HexWall({
@@ -16,12 +21,14 @@ function HexWall({
   position,
   rotation,
   onShelfClick,
+  onVolumeClick,
 }: {
   index: number;
   isActive: boolean;
   position: [number, number, number];
   rotation: [number, number, number];
   onShelfClick: (shelf: number) => void;
+  onVolumeClick: (shelf: number, volume: number) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -58,7 +65,8 @@ function HexWall({
             shelfNumber={i + 1}
             position={[0, shelfY, 0.02]}
             isActive={isActive}
-            onClick={() => isActive && onShelfClick(i + 1)}
+            onShelfClick={() => isActive && onShelfClick(i + 1)}
+            onVolumeClick={(volume: number) => isActive && onVolumeClick(i + 1, volume)}
           />
         );
       })}
@@ -74,88 +82,165 @@ function HexWall({
   );
 }
 
-function ShelfOnWall({
-  shelfNumber,
+function MiniBook({
+  volumeNumber,
   position,
+  height,
+  color,
   isActive,
   onClick,
 }: {
-  shelfNumber: number;
+  volumeNumber: number;
   position: [number, number, number];
+  height: number;
+  color: THREE.Color;
   isActive: boolean;
   onClick: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(() => {
+    if (groupRef.current) {
+      const targetZ = hovered && isActive ? 0.08 : 0;
+      groupRef.current.position.z = THREE.MathUtils.lerp(groupRef.current.position.z, targetZ, 0.1);
+    }
+  });
+
+  return (
+    <group position={position}>
+      <group ref={groupRef}>
+        <mesh
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            setHovered(true);
+            if (isActive) document.body.style.cursor = "pointer";
+          }}
+          onPointerOut={() => {
+            setHovered(false);
+            document.body.style.cursor = "default";
+          }}
+        >
+          <boxGeometry args={[0.07, height, 0.15]} />
+          <meshStandardMaterial
+            color={color}
+            emissive={hovered && isActive ? "#c9a84c" : "#000000"}
+            emissiveIntensity={hovered && isActive ? 0.4 : 0}
+          />
+        </mesh>
+        {/* Volume number on spine — facing viewer */}
+        <Text
+          position={[0, 0, 0.076]}
+          fontSize={0.035}
+          color={hovered && isActive ? "#fff" : "#7a7590"}
+          anchorX="center"
+          anchorY="middle"
+          rotation={[0, 0, -Math.PI / 2]}
+        >
+          {`${volumeNumber}`}
+        </Text>
+      </group>
+    </group>
+  );
+}
+
+function ShelfOnWall({
+  shelfNumber,
+  position,
+  isActive,
+  onShelfClick,
+  onVolumeClick,
+}: {
+  shelfNumber: number;
+  position: [number, number, number];
+  isActive: boolean;
+  onShelfClick: () => void;
+  onVolumeClick: (volume: number) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
   const meshRef = useRef<THREE.Mesh>(null);
+
+  const bookColors = useMemo(() =>
+    Array.from({ length: VOLUMES_PER_SHELF }, (_, i) => {
+      const hue = (i * 0.03 + shelfNumber * 0.1) % 1;
+      return new THREE.Color().setHSL(hue, 0.15, 0.15);
+    }),
+    [shelfNumber]
+  );
 
   useFrame(() => {
     if (meshRef.current) {
-      const target = hovered && isActive ? 0.12 : 0;
+      const target = hovered && isActive ? 0.08 : 0;
       meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, position[2] + target, 0.1);
     }
   });
 
   return (
     <group position={[position[0], position[1], 0]}>
-      {/* Shelf plank */}
+      {/* Shelf plank — clickable to navigate to shelf page */}
       <mesh
         ref={meshRef}
         position={[0, 0, position[2]]}
         onClick={(e) => {
           e.stopPropagation();
-          onClick();
+          onShelfClick();
         }}
         onPointerOver={(e) => {
           e.stopPropagation();
           setHovered(true);
-          document.body.style.cursor = isActive ? "pointer" : "default";
+          if (isActive) document.body.style.cursor = "pointer";
         }}
         onPointerOut={() => {
           setHovered(false);
           document.body.style.cursor = "default";
         }}
       >
-        <boxGeometry args={[2.8, 0.06, 0.3]} />
+        <boxGeometry args={[2.8, 0.04, 0.2]} />
         <meshStandardMaterial
           color="#3a2e1a"
           emissive={hovered && isActive ? "#c9a84c" : "#000000"}
-          emissiveIntensity={hovered && isActive ? 0.3 : 0}
+          emissiveIntensity={hovered && isActive ? 0.2 : 0}
         />
       </mesh>
 
-      {/* Mini books on shelf */}
-      {Array.from({ length: 8 }, (_, i) => {
-        const bookH = 0.2 + Math.sin(i * 2.7) * 0.08;
-        const bookX = -1.2 + i * 0.32;
-        const hue = (i * 0.05 + shelfNumber * 0.1) % 1;
-        const color = new THREE.Color().setHSL(hue, 0.15, 0.15);
+      {/* Mini books with volume labels — each clickable */}
+      {Array.from({ length: VOLUMES_PER_SHELF }, (_, i) => {
+        const volNum = i + 1;
+        const bookH = 0.18 + Math.sin(volNum * 2.3) * 0.06;
+        const bookX = -BOOKS_WIDTH / 2 + i * BOOK_SPACING + BOOK_SPACING / 2;
+
         return (
-          <mesh key={i} position={[bookX, bookH / 2 + 0.03, position[2]]}>
-            <boxGeometry args={[0.12, bookH, 0.2]} />
-            <meshStandardMaterial
-              color={color}
-              emissive={hovered && isActive ? "#c9a84c" : "#000000"}
-              emissiveIntensity={hovered ? 0.08 : 0}
-            />
-          </mesh>
+          <MiniBook
+            key={volNum}
+            volumeNumber={volNum}
+            position={[bookX, bookH / 2 + 0.02, position[2]]}
+            height={bookH}
+            color={bookColors[i]}
+            isActive={isActive}
+            onClick={() => onVolumeClick(volNum)}
+          />
         );
       })}
 
-      {/* Shelf number */}
+      {/* Shelf number label */}
       <Text
-        position={[1.55, 0.08, position[2] + 0.05]}
-        fontSize={0.08}
+        position={[1.5, 0.08, position[2] + 0.05]}
+        fontSize={0.07}
         color={hovered && isActive ? "#c9a84c" : "#4a4760"}
         anchorX="center"
         anchorY="middle"
       >
-        {`${shelfNumber}`}
+        {`п.${shelfNumber}`}
       </Text>
     </group>
   );
 }
 
-export default function HexGalleryScene({ activeWall, onShelfClick }: HexGallerySceneProps) {
+export default function HexGalleryScene({ activeWall, onShelfClick, onVolumeClick }: HexGallerySceneProps) {
   const groupRef = useRef<THREE.Group>(null);
 
   // Build hexagonal gallery — 6 walls (we use 5, 6th is the entrance)
@@ -220,6 +305,7 @@ export default function HexGalleryScene({ activeWall, onShelfClick }: HexGallery
             position={[x, 0, z]}
             rotation={[0, -wallRotation, 0]}
             onShelfClick={onShelfClick}
+            onVolumeClick={onVolumeClick}
           />
         );
       })}

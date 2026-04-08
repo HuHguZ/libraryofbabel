@@ -3,7 +3,7 @@ import { Cormorant_Garamond, JetBrains_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import FloatingParticles from "@/components/FloatingParticles";
+import ClientOverlays from "@/components/ClientOverlays";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -42,8 +42,8 @@ export default function RootLayout({
         }}
       >
         <Providers>
+          <ClientOverlays />
           <div className="hex-pattern" />
-          <FloatingParticles count={10} />
           <div style={{ position: "relative", zIndex: 1 }}>
             <Header />
             <main style={{ minHeight: "calc(100vh - 130px)" }}>{children}</main>

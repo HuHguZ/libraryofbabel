@@ -1,16 +1,24 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Box, VStack, Text, Link as ChakraLink } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import NextLink from "next/link";
 import PageTransition from "@/components/PageTransition";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
-import SceneWrapper from "@/components/explore/SceneWrapper";
-import HexGalleryScene from "@/components/explore/HexGalleryScene";
+import SceneLoadingFallback from "@/components/SceneLoadingFallback";
 import { fadeInUp, stagger, slideInLeft } from "@/lib/animations";
 import { generateRandomHex } from "@/lib/hex";
+
+const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), {
+  ssr: false,
+  loading: () => <SceneLoadingFallback />,
+});
+const HexGalleryScene = dynamic(() => import("@/components/explore/HexGalleryScene"), {
+  ssr: false,
+});
 
 const MotionBox = motion.create(Box);
 const MotionVStack = motion.create(VStack);
@@ -22,12 +30,15 @@ export default function WallExplorePage() {
   const rawWall = Number(params.wall);
   const wall = Math.max(1, Math.min(5, isNaN(rawWall) ? 1 : rawWall));
 
-  const hex = useMemo(() => {
-    return searchParams.get("hex") || generateRandomHex(4819);
-  }, [searchParams]);
+  const hexFromUrl = searchParams.get("hex");
+  const [hex] = useState(() => hexFromUrl || generateRandomHex(4819));
 
   const handleShelfClick = (shelf: number) => {
     router.push(`/explore/wall/${wall}/shelf/${shelf}?hex=${encodeURIComponent(hex)}`);
+  };
+
+  const handleVolumeClick = (shelf: number, volume: number) => {
+    router.push(`/explore/wall/${wall}/shelf/${shelf}/volume/${volume}?hex=${encodeURIComponent(hex)}`);
   };
 
   return (
@@ -94,7 +105,7 @@ export default function WallExplorePage() {
           {/* 3D Scene */}
           <MotionBox variants={fadeInUp}>
             <SceneWrapper cameraPosition={[0, 1, 6]} autoRotateSpeed={0.2}>
-              <HexGalleryScene activeWall={wall} onShelfClick={handleShelfClick} />
+              <HexGalleryScene activeWall={wall} onShelfClick={handleShelfClick} onVolumeClick={handleVolumeClick} />
             </SceneWrapper>
           </MotionBox>
 
@@ -107,7 +118,7 @@ export default function WallExplorePage() {
               fontStyle="italic"
               lineHeight="1.7"
             >
-              Нажмите на полку, чтобы увидеть тома.
+              Нажмите на книгу, чтобы перейти к тому, или на полку — чтобы увидеть все тома.
               Вращайте камеру мышью для осмотра галереи.
             </Text>
           </MotionBox>
