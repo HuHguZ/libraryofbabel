@@ -1,18 +1,32 @@
 {
   "name": "babel",
-  "version": "1.0.0",
-  "description": "Javascript Implementation of the Library Of Babel",
-  "main": "index.js",
-  "dependencies": {
-    "js-sha512": "^0.8.0"
-  },
-  "devDependencies": {},
+  "version": "2.0.0",
+  "description": "Вавилонская Библиотека — Library of Babel",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "keywords": [
-    "library"
+    "library",
+    "babel",
+    "borges"
   ],
   "author": "HuHguZ",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@chakra-ui/react": "^3.34.0",
+    "@emotion/react": "^11.14.0",
+    "@types/node": "^25.5.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.2",
+    "next": "^16.2.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^6.0.2"
+  }
 }
