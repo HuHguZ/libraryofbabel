@@ -1,13 +1,17 @@
 "use client";
 
 import { Box, Text } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
+import { usePathname } from "next/navigation";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
 import { fadeIn } from "@/lib/animations";
 
 const MotionBox = motion.create(Box);
 
 export default function Footer() {
+  const pathname = usePathname();
+  // The 3D galleries fill the viewport; a footer below them would only add a scrollbar.
+  if (pathname?.startsWith("/explore") || pathname?.startsWith("/page/")) return null;
   return (
     <MotionBox
       as="footer"

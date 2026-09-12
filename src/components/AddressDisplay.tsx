@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Box, Flex, Text, Button } from "@chakra-ui/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 interface AddressDisplayProps {
   address: string;

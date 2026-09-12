@@ -1,168 +1,140 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Box, VStack, Text, Link as ChakraLink } from "@chakra-ui/react";
-import { motion } from "framer-motion";
-import NextLink from "next/link";
+import { Box } from "@chakra-ui/react";
 import PageTransition from "@/components/PageTransition";
-import AnimatedOrnament from "@/components/AnimatedOrnament";
-import SceneLoadingFallback from "@/components/SceneLoadingFallback";
-import { fadeInUp, stagger, slideInLeft } from "@/lib/animations";
-import { generateRandomHex } from "@/lib/hex";
+import ExploreHud, { ExploreStage, HudSelector } from "@/components/explore/ExploreHud";
+import type { BookRef } from "@/components/explore/Bookcase";
+import { generateRandomHex, hashString, shortHex } from "@/lib/hex";
+import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
 
-const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), {
-  ssr: false,
-  loading: () => <SceneLoadingFallback />,
-});
-const BookshelfScene = dynamic(() => import("@/components/explore/BookshelfScene"), {
-  ssr: false,
-});
+const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), { ssr: false });
+const HexGalleryScene = dynamic(() => import("@/components/explore/HexGalleryScene"), { ssr: false });
 
-const MotionBox = motion.create(Box);
-const MotionVStack = motion.create(VStack);
+const SHELVES = Array.from({ length: LIBRARY.shelves }, (_, i) => i + 1);
+const EMPTY_TITLES = Array.from({ length: LIBRARY.volumes }, () => "");
 
 export default function ShelfExplorePage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const rawWall = Number(params.wall);
-  const rawShelf = Number(params.shelf);
-  const wall = Math.max(1, Math.min(5, isNaN(rawWall) ? 1 : rawWall));
-  const shelf = Math.max(1, Math.min(7, isNaN(rawShelf) ? 1 : rawShelf));
+  const wall = clampInt(params.wall, 1, LIBRARY.walls);
+  const shelf = clampInt(params.shelf, 1, LIBRARY.shelves);
 
-  const hexFromUrl = searchParams.get("hex");
-  const [hex] = useState(() => hexFromUrl || generateRandomHex(4819));
+  const hexParam = searchParams.get("hex");
+  const hex = isValidHex(hexParam) ? hexParam : "";
 
-  const handleVolumeClick = (volume: number) => {
-    router.push(`/explore/wall/${wall}/shelf/${shelf}/volume/${volume}?hex=${encodeURIComponent(hex)}`);
-  };
+  useEffect(() => {
+    if (!hex) router.replace(`/explore/wall/${wall}/shelf/${shelf}?hex=${generateRandomHex()}`, { scroll: false });
+  }, [hex, wall, shelf, router]);
+
+  const seed = useMemo(() => hashString(hex), [hex]);
+  const hexQuery = hex ? `?hex=${encodeURIComponent(hex)}` : "";
+
+  const [titles, setTitles] = useState<string[]>(EMPTY_TITLES);
+  const [tooltip, setTooltip] = useState<string | null>(null);
+  const [showHint, setShowHint] = useState(true);
+  const [ready, setReady] = useState(false);
+
+  // Titles of the 31 volumes on this shelf (the gallery address decides them).
+  useEffect(() => {
+    if (!hex) return;
+    const controller = new AbortController();
+    fetch("/api/titles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hex, wall, shelf }),
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((data: { titles?: string[] }) => {
+        if (Array.isArray(data.titles) && data.titles.length === LIBRARY.volumes) setTitles(data.titles);
+      })
+      .catch(() => {
+        /* aborted or offline — spines stay blank */
+      });
+    return () => controller.abort();
+  }, [hex, wall, shelf]);
+
+  // Hide the hint a while after the scene is actually visible.
+  useEffect(() => {
+    if (!ready || !showHint) return;
+    const t = setTimeout(() => setShowHint(false), 12000);
+    return () => clearTimeout(t);
+  }, [ready, showHint]);
+
+  const detail = useMemo(() => ({ shelf, titles }), [shelf, titles]);
+  const titlesRef = useRef(titles);
+  useEffect(() => {
+    titlesRef.current = titles;
+  }, [titles]);
+
+  const onHoverBook = useCallback(
+    (b: BookRef | null) => {
+      if (!b) {
+        setTooltip(null);
+        return;
+      }
+      const t = b.wall === wall && b.shelf === shelf ? titlesRef.current[b.volume - 1]?.trim() : "";
+      setTooltip(t ? `Том ${b.volume} — «${t}»` : `Том ${b.volume}`);
+    },
+    [wall, shelf]
+  );
+  const onClickBook = useCallback(
+    (b: BookRef) => router.push(`/explore/wall/${b.wall}/shelf/${b.shelf}/volume/${b.volume}${hexQuery}`),
+    [router, hexQuery]
+  );
+  const onHoverShelf = useCallback(
+    (w: number, s: number | null) => setTooltip(s ? (s === shelf && w === wall ? `Полка ${s} — вы здесь` : `Стена ${w} · Полка ${s} — перейти к этой полке`) : null),
+    [wall, shelf]
+  );
+  const onClickShelf = useCallback(
+    (w: number, s: number) => {
+      if (w === wall && s === shelf) return;
+      router.push(`/explore/wall/${w}/shelf/${s}${hexQuery}`);
+    },
+    [router, hexQuery, wall, shelf]
+  );
 
   return (
     <PageTransition>
-      <Box maxW="1000px" mx="auto" px={4} py={8}>
-        <MotionVStack
-          gap={8}
-          align="stretch"
-          variants={stagger(0.12)}
-          initial="hidden"
-          animate="visible"
+      <ExploreStage>
+        {hex && (
+          <SceneWrapper seed={seed} onReady={() => setReady(true)}>
+            <HexGalleryScene
+              key={`${wall}-${shelf}`}
+              seed={seed}
+              wall={wall}
+              mode="shelf"
+              detail={detail}
+              onHoverBook={onHoverBook}
+              onClickBook={onClickBook}
+              onHoverShelf={onHoverShelf}
+              onClickShelf={onClickShelf}
+              onInteract={() => setShowHint(false)}
+            />
+          </SceneWrapper>
+        )}
+
+        <ExploreHud
+          kicker="Книжная полка"
+          title={`Стена ${wall} · Полка ${shelf}`}
+          galleryLabel={shortHex(hex)}
+          back={{ href: `/explore/wall/${wall}${hexQuery}`, label: `стена ${wall}` }}
+          showHint={ready && showHint}
+          hint={
+            <>
+              Освещённая полка — та, что открыта: на ней {LIBRARY.volumes} том. Наведите курсор на корешок, чтобы прочесть заглавие, нажмите — чтобы раскрыть том.
+              <Box as="span" display={{ base: "none", md: "inline" }}> Колесо мыши приближает; нажатие на другую полку переводит к ней.</Box>
+            </>
+          }
+          tooltip={tooltip}
         >
-          {/* Back link */}
-          <MotionBox variants={slideInLeft}>
-            <ChakraLink
-              asChild
-              color="dark.300"
-              fontSize="sm"
-              fontFamily="var(--font-jetbrains), monospace"
-              fontWeight="300"
-              letterSpacing="0.02em"
-              transition="color 0.2s ease"
-              _hover={{ color: "brand.300", textDecoration: "none" }}
-            >
-              <NextLink href={`/explore/wall/${wall}?hex=${encodeURIComponent(hex)}`}>
-                <motion.span
-                  whileHover={{ x: -4 }}
-                  transition={{ duration: 0.2 }}
-                  style={{ display: "inline-block" }}
-                >
-                  ← стена {wall}
-                </motion.span>
-              </NextLink>
-            </ChakraLink>
-          </MotionBox>
-
-          {/* Title */}
-          <MotionBox textAlign="center" variants={fadeInUp}>
-            <Text
-              color="dark.300"
-              fontSize="10px"
-              textTransform="uppercase"
-              letterSpacing="0.15em"
-              fontFamily="var(--font-jetbrains), monospace"
-              fontWeight="500"
-              mb={2}
-            >
-              Книжная полка
-            </Text>
-            <Text
-              fontSize={{ base: "2xl", md: "3xl" }}
-              color="brand.300"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontWeight="500"
-              letterSpacing="0.04em"
-            >
-              Стена {wall} · Полка {shelf}
-            </Text>
-            <Box mt={3}>
-              <AnimatedOrnament />
-            </Box>
-          </MotionBox>
-
-          {/* 3D Scene */}
-          <MotionBox variants={fadeInUp}>
-            <SceneWrapper cameraPosition={[0, 0.5, 8]} autoRotateSpeed={0.15}>
-              <BookshelfScene wall={wall} shelf={shelf} onVolumeClick={handleVolumeClick} />
-            </SceneWrapper>
-          </MotionBox>
-
-          {/* Instruction */}
-          <MotionBox textAlign="center" variants={fadeInUp}>
-            <Text
-              color="dark.300"
-              fontSize="sm"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontStyle="italic"
-              lineHeight="1.7"
-            >
-              Нажмите на том, чтобы увидеть его страницы.
-              На этой полке 31 том.
-            </Text>
-          </MotionBox>
-
-          {/* Shelf selector */}
-          <MotionBox variants={fadeInUp}>
-            <Box display="flex" gap={2} justifyContent="center" flexWrap="wrap">
-              {Array.from({ length: 7 }, (_, i) => (
-                <motion.div
-                  key={i}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <ChakraLink asChild _hover={{ textDecoration: "none" }}>
-                    <NextLink href={`/explore/wall/${wall}/shelf/${i + 1}?hex=${encodeURIComponent(hex)}`}>
-                      <Box
-                        px={3}
-                        py={2}
-                        borderRadius="6px"
-                        bg={shelf === i + 1 ? "brand.300/12" : "transparent"}
-                        border="1px solid"
-                        borderColor={shelf === i + 1 ? "brand.300/30" : "dark.400/30"}
-                        cursor="pointer"
-                        transition="all 0.2s ease"
-                        _hover={{
-                          bg: "brand.300/8",
-                          borderColor: "brand.300/25",
-                        }}
-                      >
-                        <Text
-                          color={shelf === i + 1 ? "brand.300" : "dark.200"}
-                          fontSize="sm"
-                          fontFamily="var(--font-jetbrains), monospace"
-                          fontWeight="400"
-                        >
-                          {i + 1}
-                        </Text>
-                      </Box>
-                    </NextLink>
-                  </ChakraLink>
-                </motion.div>
-              ))}
-            </Box>
-          </MotionBox>
-        </MotionVStack>
-      </Box>
+          <HudSelector label="Полка" items={SHELVES} active={shelf} hrefFor={(s) => `/explore/wall/${wall}/shelf/${s}${hexQuery}`} />
+        </ExploreHud>
+      </ExploreStage>
     </PageTransition>
   );
 }

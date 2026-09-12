@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform } from "motion/react";
 
 /* ─── Single hexagon path helper ─── */
 function hexPath(cx: number, cy: number, r: number): string {
@@ -131,9 +131,8 @@ function ParallaxHex({ def }: { def: HexDef }) {
   const { scrollYProgress } = useScroll();
 
   const y = useTransform(scrollYProgress, [0, 1], [0, def.speed]);
-  const rotate = def.rotate
-    ? useTransform(scrollYProgress, [0, 1], def.rotate)
-    : undefined;
+  const rotateValue = useTransform(scrollYProgress, [0, 1], def.rotate ?? [0, 0]);
+  const rotate = def.rotate ? rotateValue : undefined;
 
   const cx = def.size + 4;
   const cy = def.size + 4;

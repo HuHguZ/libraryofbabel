@@ -1,30 +1,6 @@
-"use client";
+import { Box } from "@chakra-ui/react";
 
-import { Box, VStack } from "@chakra-ui/react";
-import {
-  SkeletonLine,
-  SkeletonOrnament,
-  SkeletonPage,
-} from "@/components/LoadingSkeleton";
-import SceneLoadingFallback from "@/components/SceneLoadingFallback";
-
-export default function VolumeLoading() {
-  return (
-    <SkeletonPage>
-      <Box maxW="1000px" mx="auto" px={4} py={8}>
-        <VStack gap={8} align="stretch">
-          <SkeletonLine width="80px" height="14px" />
-          <VStack gap={2}>
-            <SkeletonLine width="100px" height="10px" />
-            <SkeletonLine width="260px" height="28px" />
-            <SkeletonOrnament />
-          </VStack>
-          <SceneLoadingFallback height={{ base: "65vh", md: "75vh" }} />
-          <VStack gap={2}>
-            <SkeletonLine width="200px" height="12px" />
-          </VStack>
-        </VStack>
-      </Box>
-    </SkeletonPage>
-  );
+/** Dark stage placeholder while the immersive page and its scene load. */
+export default function Loading() {
+  return <Box w="100%" h="calc(100dvh - var(--header-h))" minH="440px" bg="#07060a" />;
 }

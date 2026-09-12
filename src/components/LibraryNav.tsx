@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Flex, Text } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { counterPop, stagger } from "@/lib/animations";
 import NextLink from "next/link";
 

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 
 const FloatingParticles = dynamic(
   () => import("@/components/FloatingParticles"),
@@ -16,11 +17,13 @@ const DecorativeHexagons = dynamic(
 );
 
 export default function ClientOverlays() {
+  const pathname = usePathname();
+  const immersive = (pathname?.startsWith("/explore") || pathname?.startsWith("/page/")) ?? false;
   return (
     <>
       <NavigationProgress />
-      <FloatingParticles count={10} />
-      <DecorativeHexagons />
+      {!immersive && <FloatingParticles count={10} />}
+      {!immersive && <DecorativeHexagons />}
     </>
   );
 }

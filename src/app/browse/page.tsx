@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Box, VStack, Heading, Text, Button, Flex } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
 import PageTransition from "@/components/PageTransition";
 import { fadeInUp, stagger, scaleFade } from "@/lib/animations";

@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { motion } from "motion/react";
+import { useState } from "react";
 
 interface Particle {
   id: number;
@@ -11,20 +11,19 @@ interface Particle {
   duration: number;
 }
 
-export default function FloatingParticles({ count = 12 }: { count?: number }) {
-  const [particles, setParticles] = useState<Particle[]>([]);
+function makeParticles(count: number): Particle[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i,
+    left: `${Math.random() * 100}%`,
+    size: 2 + Math.random() * 3,
+    delay: Math.random() * 5,
+    duration: 4 + Math.random() * 6,
+  }));
+}
 
-  useEffect(() => {
-    setParticles(
-      Array.from({ length: count }, (_, i) => ({
-        id: i,
-        left: `${Math.random() * 100}%`,
-        size: 2 + Math.random() * 3,
-        delay: Math.random() * 5,
-        duration: 4 + Math.random() * 6,
-      }))
-    );
-  }, [count]);
+/** Rendered client-side only (see ClientOverlays), so the random layout never has to match server markup. */
+export default function FloatingParticles({ count = 12 }: { count?: number }) {
+  const [particles] = useState<Particle[]>(() => makeParticles(count));
 
   return (
     <div

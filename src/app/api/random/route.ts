@@ -1,32 +1,17 @@
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
-
-const DIGS = "0123456789abcdefghijklmnopqrstuvwxyz";
-const LENGTH_OF_PAGE = 4819;
-const WALL = 5;
-const SHELF = 7;
-const VOLUME = 31;
-const PAGE = 421;
+import { DIGS, LIBRARY } from "@/lib/library";
 
 function randomInt(max: number): number {
-  const bytes = randomBytes(4);
-  return (bytes.readUInt32BE(0) % max) + 1;
+  return (randomBytes(4).readUInt32BE(0) % max) + 1;
 }
 
 export async function GET() {
-  // Generate random hex using crypto
-  const bytes = randomBytes(LENGTH_OF_PAGE);
+  const bytes = randomBytes(LIBRARY.pageLength);
   let hex = "";
-  for (let i = 0; i < LENGTH_OF_PAGE; i++) {
+  for (let i = 0; i < LIBRARY.pageLength; i++) {
     hex += DIGS[bytes[i] % DIGS.length];
   }
-
-  const wall = randomInt(WALL);
-  const shelf = randomInt(SHELF);
-  const volume = randomInt(VOLUME);
-  const page = randomInt(PAGE);
-
-  const address = `${hex}-${wall}-${shelf}-${volume}-${page}`;
-
+  const address = `${hex}-${randomInt(LIBRARY.walls)}-${randomInt(LIBRARY.shelves)}-${randomInt(LIBRARY.volumes)}-${randomInt(LIBRARY.pages)}`;
   return NextResponse.json({ address });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, VStack, Flex } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import {
   SkeletonLine,
   SkeletonBox,

@@ -1,179 +1,170 @@
 "use client";
 
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { Box, VStack, Text, Link as ChakraLink } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { Box, Flex, Text } from "@chakra-ui/react";
 import NextLink from "next/link";
 import PageTransition from "@/components/PageTransition";
-import AnimatedOrnament from "@/components/AnimatedOrnament";
-import SceneLoadingFallback from "@/components/SceneLoadingFallback";
-import { fadeInUp, stagger, slideInLeft } from "@/lib/animations";
-import { generateRandomHex } from "@/lib/hex";
+import ExploreHud, { ExploreStage } from "@/components/explore/ExploreHud";
+import { generateRandomHex, hashString, shortHex } from "@/lib/hex";
+import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
 
-const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), {
-  ssr: false,
-  loading: () => <SceneLoadingFallback height={{ base: "65vh", md: "75vh" }} />,
-});
-const VolumeScene = dynamic(() => import("@/components/explore/VolumeScene"), {
-  ssr: false,
-});
+const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), { ssr: false });
+const VolumeScene = dynamic(() => import("@/components/explore/VolumeScene"), { ssr: false });
 
-const MotionBox = motion.create(Box);
-const MotionVStack = motion.create(VStack);
+const mono = "var(--font-jetbrains), monospace";
+
+function Crumb({ href, children, current }: { href?: string; children: React.ReactNode; current?: boolean }) {
+  const inner = (
+    <Text
+      color={current ? "brand.300" : "dark.50"}
+      fontSize="xs"
+      fontFamily={mono}
+      px={3}
+      py={1.5}
+      borderRadius="4px"
+      bg="rgba(7,6,10,0.55)"
+      border="1px solid"
+      borderColor={current ? "brand.300/50" : "dark.400/50"}
+      backdropFilter="blur(6px)"
+      transition="all 0.2s ease"
+      _hover={href ? { color: "brand.200", borderColor: "brand.300/40" } : undefined}
+    >
+      {children}
+    </Text>
+  );
+  return href ? (
+    <NextLink href={href} style={{ textDecoration: "none" }}>
+      {inner}
+    </NextLink>
+  ) : (
+    inner
+  );
+}
 
 export default function VolumeExplorePage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const rawWall = Number(params.wall);
-  const rawShelf = Number(params.shelf);
-  const rawVolume = Number(params.volume);
-  const wall = Math.max(1, Math.min(5, isNaN(rawWall) ? 1 : rawWall));
-  const shelf = Math.max(1, Math.min(7, isNaN(rawShelf) ? 1 : rawShelf));
-  const volume = Math.max(1, Math.min(31, isNaN(rawVolume) ? 1 : rawVolume));
+  const wall = clampInt(params.wall, 1, LIBRARY.walls);
+  const shelf = clampInt(params.shelf, 1, LIBRARY.shelves);
+  const volume = clampInt(params.volume, 1, LIBRARY.volumes);
 
-  const hexFromUrl = searchParams.get("hex");
-  const [hex, setHex] = useState(hexFromUrl || "");
+  const hexParam = searchParams.get("hex");
+  const hex = isValidHex(hexParam) ? hexParam : "";
 
   useEffect(() => {
-    if (!hexFromUrl) {
-      setHex(generateRandomHex(4819));
-    }
-  }, [hexFromUrl]);
+    if (!hex) router.replace(`/explore/wall/${wall}/shelf/${shelf}/volume/${volume}?hex=${generateRandomHex()}`, { scroll: false });
+  }, [hex, wall, shelf, volume, router]);
 
-  const handlePageClick = (page: number) => {
-    const address = `${hex}-${wall}-${shelf}-${volume}-${page}`;
-    router.push(`/page/${encodeURIComponent(address)}`);
-  };
+  const hexQuery = hex ? `?hex=${encodeURIComponent(hex)}` : "";
+  const seed = useMemo(() => hashString(hex), [hex]);
+  const [title, setTitle] = useState("");
+  const [tooltip, setTooltip] = useState<string | null>(null);
+  const [showHint, setShowHint] = useState(true);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!hex) return;
+    const controller = new AbortController();
+    fetch("/api/title", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: `${hex}-${wall}-${shelf}-${volume}-1` }),
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((data: { title?: string }) => {
+        if (typeof data.title === "string") setTitle(data.title);
+      })
+      .catch(() => {
+        /* offline or aborted */
+      });
+    return () => controller.abort();
+  }, [hex, wall, shelf, volume]);
+
+  // Hide the hint a while after the scene is actually visible.
+  useEffect(() => {
+    if (!ready || !showHint) return;
+    const t = setTimeout(() => setShowHint(false), 12000);
+    return () => clearTimeout(t);
+  }, [ready, showHint]);
+
+  const onHoverPage = useCallback((page: number | null) => setTooltip(page ? `Страница ${page} — открыть` : null), []);
+  const onClickPage = useCallback(
+    (page: number) => {
+      if (!hex) return;
+      router.push(`/page/${encodeURIComponent(`${hex}-${wall}-${shelf}-${volume}-${page}`)}`);
+    },
+    [router, hex, wall, shelf, volume]
+  );
 
   return (
     <PageTransition>
-      <Box maxW="1000px" mx="auto" px={4} py={8}>
-        <MotionVStack
-          gap={8}
-          align="stretch"
-          variants={stagger(0.12)}
-          initial="hidden"
-          animate="visible"
+      <ExploreStage>
+        {hex && (
+          <SceneWrapper seed={seed} onReady={() => setReady(true)}>
+          <VolumeScene
+            title={title}
+            wall={wall}
+            shelf={shelf}
+            volume={volume}
+            onHoverPage={onHoverPage}
+            onClickPage={onClickPage}
+            onInteract={() => setShowHint(false)}
+          />
+          </SceneWrapper>
+        )}
+
+        <ExploreHud
+          kicker="Открытый том"
+          title={title.trim() ? `«${title.trim()}»` : `Том ${volume}`}
+          galleryLabel={shortHex(hex)}
+          back={{ href: `/explore/wall/${wall}/shelf/${shelf}${hexQuery}`, label: `полка ${shelf}` }}
+          showHint={ready && showHint}
+          hint={
+            <>
+              В томе {LIBRARY.pages} страница. Наведите на номер в указателе и нажмите, чтобы открыть страницу.
+              <Box as="span" display={{ base: "none", md: "inline" }}> Тяните мышью, чтобы наклонить книгу, колесо приближает.</Box>
+            </>
+          }
+          tooltip={tooltip}
         >
-          {/* Back link */}
-          <MotionBox variants={slideInLeft}>
-            <ChakraLink
-              asChild
-              color="dark.300"
-              fontSize="sm"
-              fontFamily="var(--font-jetbrains), monospace"
-              fontWeight="300"
-              letterSpacing="0.02em"
-              transition="color 0.2s ease"
-              _hover={{ color: "brand.300", textDecoration: "none" }}
-            >
-              <NextLink href={`/explore/wall/${wall}/shelf/${shelf}?hex=${encodeURIComponent(hex)}`}>
-                <motion.span
-                  whileHover={{ x: -4 }}
-                  transition={{ duration: 0.2 }}
-                  style={{ display: "inline-block" }}
-                >
-                  ← полка {shelf}
-                </motion.span>
-              </NextLink>
-            </ChakraLink>
-          </MotionBox>
-
-          {/* Title */}
-          <MotionBox textAlign="center" variants={fadeInUp}>
-            <Text
-              color="dark.300"
-              fontSize="10px"
-              textTransform="uppercase"
-              letterSpacing="0.15em"
-              fontFamily="var(--font-jetbrains), monospace"
-              fontWeight="500"
-              mb={2}
-            >
-              Открытый том
+          <Flex align="center" gap={2} flexWrap="wrap" justify="center">
+            <Crumb href={`/explore/wall/${wall}${hexQuery}`}>Стена {wall}</Crumb>
+            <Text color="dark.300" fontSize="xs">
+              →
             </Text>
-            <Text
-              fontSize={{ base: "2xl", md: "3xl" }}
-              color="brand.300"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontWeight="500"
-              letterSpacing="0.04em"
-            >
-              Стена {wall} · Полка {shelf} · Том {volume}
+            <Crumb href={`/explore/wall/${wall}/shelf/${shelf}${hexQuery}`}>Полка {shelf}</Crumb>
+            <Text color="dark.300" fontSize="xs">
+              →
             </Text>
-            <Box mt={3}>
-              <AnimatedOrnament />
+            <Crumb current>Том {volume}</Crumb>
+            <Box w="1px" h="20px" bg="dark.400/50" mx={1} display={{ base: "none", sm: "block" }} />
+            <Box
+              as="button"
+              display={{ base: "none", sm: "block" }}
+              onClick={() => onClickPage(1 + Math.floor(Math.random() * LIBRARY.pages))}
+              px={3}
+              py={1.5}
+              borderRadius="4px"
+              bg="rgba(7,6,10,0.55)"
+              border="1px solid"
+              borderColor="dark.400/50"
+              color="dark.50"
+              fontSize="xs"
+              fontFamily={mono}
+              cursor="pointer"
+              backdropFilter="blur(6px)"
+              transition="all 0.2s ease"
+              _hover={{ color: "brand.200", borderColor: "brand.300/40" }}
+            >
+              ✦ случайная страница
             </Box>
-          </MotionBox>
-
-          {/* 3D Scene */}
-          <MotionBox variants={fadeInUp}>
-            <SceneWrapper key={`volume-${wall}-${shelf}-${volume}`} cameraPosition={[0, 0, 7]} autoRotate={false} height={{ base: "65vh", md: "75vh" }}>
-              <VolumeScene
-                onPageClick={handlePageClick}
-              />
-            </SceneWrapper>
-          </MotionBox>
-
-          {/* Instruction */}
-          <MotionBox textAlign="center" variants={fadeInUp}>
-            <Text
-              color="dark.300"
-              fontSize="sm"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontStyle="italic"
-              lineHeight="1.7"
-            >
-              Нажмите на страницу, чтобы открыть её.
-              В этом томе 421 страница.
-            </Text>
-          </MotionBox>
-
-          {/* Breadcrumb navigation */}
-          <MotionBox variants={fadeInUp}>
-            <Box display="flex" gap={2} justifyContent="center" alignItems="center" flexWrap="wrap">
-              <ChakraLink asChild _hover={{ textDecoration: "none" }}>
-                <NextLink href={`/explore/wall/${wall}?hex=${encodeURIComponent(hex)}`}>
-                  <Text
-                    color="dark.300"
-                    fontSize="xs"
-                    fontFamily="var(--font-jetbrains), monospace"
-                    _hover={{ color: "brand.300" }}
-                    transition="color 0.2s ease"
-                  >
-                    Стена {wall}
-                  </Text>
-                </NextLink>
-              </ChakraLink>
-              <Text color="dark.400" fontSize="xs">→</Text>
-              <ChakraLink asChild _hover={{ textDecoration: "none" }}>
-                <NextLink href={`/explore/wall/${wall}/shelf/${shelf}?hex=${encodeURIComponent(hex)}`}>
-                  <Text
-                    color="dark.300"
-                    fontSize="xs"
-                    fontFamily="var(--font-jetbrains), monospace"
-                    _hover={{ color: "brand.300" }}
-                    transition="color 0.2s ease"
-                  >
-                    Полка {shelf}
-                  </Text>
-                </NextLink>
-              </ChakraLink>
-              <Text color="dark.400" fontSize="xs">→</Text>
-              <Text
-                color="brand.300"
-                fontSize="xs"
-                fontFamily="var(--font-jetbrains), monospace"
-              >
-                Том {volume}
-              </Text>
-            </Box>
-          </MotionBox>
-        </MotionVStack>
-      </Box>
+          </Flex>
+        </ExploreHud>
+      </ExploreStage>
     </PageTransition>
   );
 }

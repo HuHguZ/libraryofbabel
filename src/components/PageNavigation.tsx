@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Box, Flex, Text } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 
 const MotionFlex = motion.create(Flex);

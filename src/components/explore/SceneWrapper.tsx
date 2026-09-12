@@ -1,180 +1,115 @@
 "use client";
 
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { Canvas, events as defaultEvents, type RootState } from "@react-three/fiber";
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { Box, Text } from "@chakra-ui/react";
-import { motion } from "framer-motion";
-import { ReactNode, Suspense, useState, useEffect, useRef } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import * as THREE from "three";
+import { LibraryMaterialsProvider } from "./materials";
+import { isCenterAim } from "./cursor";
 
 interface SceneWrapperProps {
   children: ReactNode;
-  cameraPosition?: [number, number, number];
-  cameraTarget?: [number, number, number];
-  autoRotate?: boolean;
-  autoRotateSpeed?: number;
-  height?: Record<string, string> | string;
+  /** Gallery seed: picks textures and binding colours. */
+  seed?: number;
+  /** Bloom + vignette post-processing (on by default). */
+  post?: boolean;
+  onReady?: () => void;
 }
 
-function SceneReadyDetector({ onReady }: { onReady: () => void }) {
-  useState(() => {
-    onReady();
-  });
-  return null;
-}
-
-function KeyboardMovement({ controlsRef }: { controlsRef: React.RefObject<typeof OrbitControls extends React.ForwardRefExoticComponent<infer P> ? (P extends { ref?: React.Ref<infer T> } ? T : never) : never> }) {
-  const { camera } = useThree();
-  const keys = useRef<Set<string>>(new Set());
-  const speed = 3;
-
-  const moveCodes = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
-
+function ReadySignal({ onReady }: { onReady: () => void }) {
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (moveCodes.has(e.code)) {
-        e.preventDefault();
-        keys.current.add(e.code);
-      }
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      keys.current.delete(e.code);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-    };
-  }, []);
-
-  useFrame((_, delta) => {
-    if (keys.current.size === 0) return;
-
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-
-    const right = new THREE.Vector3();
-    right.crossVectors(forward, camera.up).normalize();
-
-    const move = new THREE.Vector3();
-
-    if (keys.current.has("KeyW") || keys.current.has("ArrowUp")) move.add(forward);
-    if (keys.current.has("KeyS") || keys.current.has("ArrowDown")) move.sub(forward);
-    if (keys.current.has("KeyD") || keys.current.has("ArrowRight")) move.add(right);
-    if (keys.current.has("KeyA") || keys.current.has("ArrowLeft")) move.sub(right);
-
-    if (move.lengthSq() === 0) return;
-    move.normalize().multiplyScalar(speed * delta);
-
-    camera.position.add(move);
-
-    // Keep OrbitControls target in sync
-    const controls = controlsRef.current as unknown as { target: THREE.Vector3 };
-    if (controls?.target) {
-      controls.target.add(move);
-    }
-  });
-
+    onReady();
+  }, [onReady]);
   return null;
 }
 
-export default function SceneWrapper({
-  children,
-  cameraPosition = [0, 2, 8],
-  cameraTarget,
-  autoRotate = true,
-  autoRotateSpeed = 0.3,
-  height,
-}: SceneWrapperProps) {
+/**
+ * Pointer events like the defaults, except that a captured mouse (shooter-style look, real pointer
+ * lock or the free-mouse fallback) always aims at the centre of the screen, where the reticle is.
+ */
+const sceneEvents = (store: Parameters<typeof defaultEvents>[0]) => {
+  const base = defaultEvents(store);
+  return {
+    ...base,
+    compute(event: MouseEvent, state: RootState) {
+      const canvas = state.gl.domElement;
+      if ((typeof document !== "undefined" && document.pointerLockElement === canvas) || isCenterAim(canvas)) {
+        state.pointer.set(0, 0);
+      } else {
+        state.pointer.set((event.offsetX / state.size.width) * 2 - 1, -(event.offsetY / state.size.height) * 2 + 1);
+      }
+      state.raycaster.setFromCamera(state.pointer, state.camera);
+    },
+  };
+};
+
+/**
+ * Full-bleed WebGL stage. Textures and materials are provided to every scene,
+ * and a loading veil is shown until the scene has actually mounted.
+ */
+export default function SceneWrapper({ children, seed = 0, post = true, onReady }: SceneWrapperProps) {
   const [ready, setReady] = useState(false);
-  const orbitRef = useRef<any>(null);
 
   return (
-    <Box
-      w="100%"
-      h={height ?? { base: "50vh", md: "60vh" }}
-      borderRadius="8px"
-      overflow="hidden"
-      border="1px solid"
-      borderColor="brand.300/10"
-      bg="dark.900"
-      position="relative"
-    >
-      {/* Loading overlay — shown until scene children mount */}
-      {!ready && (
-        <Box
-          position="absolute"
-          inset={0}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          zIndex={2}
-          bg="dark.900"
-        >
-          <motion.div
-            animate={{ opacity: [0.3, 0.8, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <Text
-              color="dark.300"
-              fontSize="xs"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontStyle="italic"
-            >
-              Загрузка 3D...
-            </Text>
-          </motion.div>
-        </Box>
-      )}
-
+    <Box position="absolute" inset={0} bg="#07060a">
       <Canvas
-        camera={{ position: cameraPosition, fov: 50 }}
-        gl={{ antialias: true, alpha: true }}
-        style={{ background: "linear-gradient(180deg, #0c0c14 0%, #08080f 100%)" }}
+        dpr={[1, 1.75]}
+        gl={{ antialias: false, powerPreference: "high-performance", stencil: false }}
+        camera={{ fov: 58, near: 0.05, far: 80, position: [0, 1.6, 0] }}
+        events={sceneEvents}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.05;
+        }}
+        style={{ position: "absolute", inset: 0 }}
       >
+        <color attach="background" args={["#07060a"]} />
         <Suspense fallback={null}>
-          {/* Ambient gold light */}
-          <ambientLight intensity={0.15} color="#c9a84c" />
-          <ambientLight intensity={0.1} color="#ffffff" />
-
-          {/* Main directional light */}
-          <directionalLight
-            position={[5, 8, 5]}
-            intensity={0.6}
-            color="#f5e6c8"
-            castShadow
-          />
-
-          {/* Accent point lights */}
-          <pointLight position={[-3, 4, -2]} intensity={0.3} color="#c9a84c" distance={15} />
-          <pointLight position={[3, 2, 4]} intensity={0.2} color="#dcc48a" distance={12} />
-
-          {/* Fog for depth */}
-          <fog attach="fog" args={["#08080f", 8, 25]} />
-
-          {children}
-
-          <SceneReadyDetector onReady={() => setReady(true)} />
-
-          <KeyboardMovement controlsRef={orbitRef} />
-
-          <OrbitControls
-            ref={orbitRef}
-            autoRotate={autoRotate}
-            autoRotateSpeed={autoRotateSpeed}
-            enableZoom={true}
-            enablePan={true}
-            minDistance={2}
-            maxDistance={15}
-            maxPolarAngle={Math.PI / 1.8}
-            minPolarAngle={Math.PI / 6}
-            {...(cameraTarget ? { target: cameraTarget } : {})}
-          />
+          <LibraryMaterialsProvider seed={seed}>
+            {children}
+            <ReadySignal
+              onReady={() => {
+                setReady(true);
+                onReady?.();
+              }}
+            />
+          </LibraryMaterialsProvider>
+          {post && (
+            <EffectComposer multisampling={4}>
+              <Bloom mipmapBlur luminanceThreshold={0.82} luminanceSmoothing={0.3} intensity={0.85} radius={0.55} />
+              <Vignette eskil={false} offset={0.22} darkness={0.72} />
+            </EffectComposer>
+          )}
         </Suspense>
       </Canvas>
+
+      <AnimatePresence>
+        {!ready && (
+          <motion.div
+            key="veil"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.9, ease: "easeOut" } }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#07060a",
+              zIndex: 3,
+              pointerEvents: "none",
+            }}
+          >
+            <motion.div animate={{ opacity: [0.35, 0.9, 0.35] }} transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}>
+              <Text color="dark.100" fontSize="sm" fontFamily="var(--font-cormorant), Georgia, serif" fontStyle="italic" letterSpacing="0.08em">
+                Лампы разгораются…
+              </Text>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Box>
   );
 }

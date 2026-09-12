@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { ornamentLine, ornamentDiamond } from "@/lib/animations";
 
 export default function AnimatedOrnament() {

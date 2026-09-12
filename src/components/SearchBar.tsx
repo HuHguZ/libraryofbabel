@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Box, Input, Flex, Button, Spinner } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
+import { Box, Input, Flex, Button, Spinner, Text } from "@chakra-ui/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
+import { foreignSymbols, normalizeQuery } from "@/lib/alphabet";
 
 type SearchMode = "search" | "search-exactly" | "search-title";
 
+const serif = "var(--font-cormorant), Georgia, serif";
 
 export default function SearchBar() {
   const [text, setText] = useState("");
@@ -14,22 +16,26 @@ export default function SearchBar() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // The Library knows 36 symbols; show what will actually be looked for when the phrase has others.
+  const normalized = useMemo(() => normalizeQuery(text).trim(), [text]);
+  const foreign = useMemo(() => foreignSymbols(text), [text]);
+  const changed = text.trim() !== "" && normalized !== text.trim();
+
   const handleSearch = async (overrideMode?: SearchMode) => {
-    if (!text.trim()) return;
+    if (!normalized) return;
     const activeMode = overrideMode ?? mode;
     setLoading(true);
     try {
       const endpoint = `/api/${activeMode}`;
-      const body =
-        activeMode === "search-title" ? { title: text } : { text };
+      const body = activeMode === "search-title" ? { title: normalized } : { text: normalized };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
+      const data = (await res.json()) as { address?: string; query?: string };
       if (data.address) {
-        const q = encodeURIComponent(text);
+        const q = encodeURIComponent(data.query ?? normalized);
         router.push(`/page/${encodeURIComponent(data.address)}?q=${q}`);
       }
     } catch (err) {
@@ -80,6 +86,41 @@ export default function SearchBar() {
         </Box>
       </motion.div>
 
+      <AnimatePresence>
+        {changed && (
+          <motion.div
+            key="hint"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            style={{ overflow: "hidden" }}
+          >
+            <Text color="dark.100" fontSize="sm" fontFamily={serif} fontStyle="italic" textAlign="center" mt={3} lineHeight="1.5">
+              В Библиотеке только строчные русские буквы, пробел, запятая и точка
+              {foreign.length > 0 && (
+                <>
+                  {" "}
+                  — символы{" "}
+                  <Box as="span" fontFamily="var(--font-jetbrains), monospace" fontStyle="normal" color="brand.200">
+                    {foreign.slice(0, 8).join(" ")}
+                  </Box>{" "}
+                  не найти
+                </>
+              )}
+              .{" "}
+              {normalized ? (
+                <>
+                  Будем искать: <Box as="span" color="brand.300" fontStyle="normal">«{normalized}»</Box>
+                </>
+              ) : (
+                "Наберите текст русскими буквами."
+              )}
+            </Text>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Flex gap={2} justify="center" mt={4}>
         {modes.map((m, i) => (
           <motion.div
@@ -95,7 +136,7 @@ export default function SearchBar() {
               <Button
                 onClick={() => {
                   setMode(m.key);
-                  if (text.trim()) handleSearch(m.key);
+                  if (normalized) handleSearch(m.key);
                 }}
                 bg={mode === m.key ? "brand.300/12" : "transparent"}
                 color={mode === m.key ? "brand.300" : "dark.200"}

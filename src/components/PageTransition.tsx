@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { pageTransition } from "@/lib/animations";
 import type { ReactNode } from "react";
 

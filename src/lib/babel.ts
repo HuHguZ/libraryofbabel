@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import type { BabelConfig, BabelLibrary } from "./types";
+import { normalizeQuery } from "./alphabet";
 
 const DEFAULT_CONFIG: BabelConfig = {
   lengthOfPage: 4819,
@@ -66,6 +67,8 @@ export function createBabel(config?: Partial<BabelConfig>): BabelLibrary {
     config: cfg,
 
     search(searchStr: string): string {
+      // Only the Library's own symbols can be encoded; anything else would come out as a full stop.
+      searchStr = normalizeQuery(searchStr).slice(0, lengthOfPage);
       const w = `${((Math.random() * cfg.wall + 1) ^ 0)}`;
       const sh = `${((Math.random() * cfg.shelf + 1) ^ 0)}`;
       const vol = pad(`${((Math.random() * cfg.volume + 1) ^ 0)}`, 2);
@@ -91,6 +94,7 @@ export function createBabel(config?: Partial<BabelConfig>): BabelLibrary {
     },
 
     searchExactly(text: string): string {
+      text = normalizeQuery(text).slice(0, lengthOfPage);
       const pos = (Math.random() * (lengthOfPage - text.length)) ^ 0;
       const padded = `${" ".repeat(pos)}${text}${" ".repeat(lengthOfPage - (pos + text.length))}`;
       return this.search(padded);
@@ -103,7 +107,7 @@ export function createBabel(config?: Partial<BabelConfig>): BabelLibrary {
       const locHash = getHash(`${w}${sh}${vol}`);
       let hex = "";
 
-      searchStr = searchStr.substring(0, lengthOfTitle);
+      searchStr = normalizeQuery(searchStr).substring(0, lengthOfTitle);
       if (searchStr.length < lengthOfTitle) {
         searchStr += " ".repeat(lengthOfTitle - searchStr.length);
       }

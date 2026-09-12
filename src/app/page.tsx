@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Box, Heading, Text, VStack, Flex } from "@chakra-ui/react";
 import {
   motion,
@@ -10,10 +10,10 @@ import {
   useMotionValue,
   useSpring,
   AnimatePresence,
-  type MotionValue,
-} from "framer-motion";
+} from "motion/react";
 import { useRouter } from "next/navigation";
 import NextLink from "next/link";
+import Image from "next/image";
 import SearchBar from "@/components/SearchBar";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
 import PageTransition from "@/components/PageTransition";
@@ -28,60 +28,15 @@ import {
 const MotionBox = motion.create(Box);
 const MotionVStack = motion.create(VStack);
 const MotionText = motion.create(Text);
-const MotionFlex = motion.create(Flex);
-const MotionHeading = motion.create(Heading);
 
-/* ─── Parallax wrapper ─── */
-function useParallax(offset: [string, string] = ["start end", "end start"]) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: offset as any });
-  return { ref, scrollYProgress };
-}
-
-function ParallaxLayer({
-  children,
-  speed = 0.5,
-  className,
-  style,
-}: {
-  children: ReactNode;
-  speed?: number;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
+/* ─── Scroll progress of a section (0 → 1 while it crosses the viewport) ─── */
+function useSectionProgress() {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start end", "end start"],
   });
-  const y = useTransform(scrollYProgress, [0, 1], [speed * 100, speed * -100]);
-
-  return (
-    <motion.div ref={ref} style={{ y, ...style }} className={className}>
-      {children}
-    </motion.div>
-  );
-}
-
-/* Parallax section: tracks its own scroll and exposes transforms */
-function ParallaxSection({
-  children,
-  style,
-}: {
-  children: (progress: MotionValue<number>) => ReactNode;
-  style?: React.CSSProperties;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start end", "end start"],
-  });
-
-  return (
-    <div ref={ref} style={{ position: "relative", ...style }}>
-      {children(scrollYProgress)}
-    </div>
-  );
+  return { ref, progress: scrollYProgress };
 }
 
 /* ─── Animated counter ─── */
@@ -279,17 +234,6 @@ const CubeIcon = () => (
   </svg>
 );
 
-const DiceIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" />
-    <circle cx="8.5" cy="8.5" r="1" fill="currentColor" />
-    <circle cx="15.5" cy="8.5" r="1" fill="currentColor" />
-    <circle cx="12" cy="12" r="1" fill="currentColor" />
-    <circle cx="8.5" cy="15.5" r="1" fill="currentColor" />
-    <circle cx="15.5" cy="15.5" r="1" fill="currentColor" />
-  </svg>
-);
-
 /* ─── Decorative SVG ornament between sections ─── */
 function SectionOrnament() {
   return (
@@ -377,12 +321,746 @@ function ScrollIndicator() {
             y1="7"
             x2="10"
             y2="13"
-            animate={{ y1: [7, 10, 7], y2: [13, 16, 13] }}
+            animate={{ y: [0, 3, 0] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           />
         </svg>
       </motion.div>
     </motion.div>
+  );
+}
+
+function SearchSection() {
+  const { ref, progress } = useSectionProgress();
+          const titleY = useTransform(progress, [0, 1], [40, -40]);
+          const searchY = useTransform(progress, [0, 1], [60, -20]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+            <Box py={{ base: 16, md: 24 }} px={4}>
+              <MotionVStack
+                gap={8}
+                maxW="700px"
+                mx="auto"
+                textAlign="center"
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-80px" }}
+                variants={stagger(0.12)}
+              >
+                <motion.div variants={scrollFadeInUp} style={{ y: titleY }}>
+                  <Text
+                    color="dark.300"
+                    fontSize="10px"
+                    fontWeight="500"
+                    textTransform="uppercase"
+                    letterSpacing="0.3em"
+                    fontFamily="var(--font-jetbrains), monospace"
+                    mb={3}
+                  >
+                    Найти в бесконечности
+                  </Text>
+                  <Heading
+                    as="h2"
+                    fontSize={{ base: "2xl", md: "4xl" }}
+                    color="brand.300"
+                    fontFamily="var(--font-cormorant), Georgia, serif"
+                    fontWeight="400"
+                    letterSpacing="0.04em"
+                  >
+                    Поиск по Библиотеке
+                  </Heading>
+                </motion.div>
+
+                <motion.div style={{ y: titleY }}>
+                  <MotionText
+                    color="dark.200"
+                    fontSize={{ base: "md", md: "lg" }}
+                    lineHeight="1.8"
+                    maxW="500px"
+                    fontFamily="var(--font-cormorant), Georgia, serif"
+                    fontStyle="italic"
+                    variants={scrollFadeInUp}
+                  >
+                    Введите любой текст — и Библиотека укажет точную страницу, на которой
+                    он записан, среди бесконечных томов.
+                  </MotionText>
+                </motion.div>
+
+                <motion.div variants={scrollFadeInUp} style={{ width: "100%", y: searchY }}>
+                  <SearchBar />
+                </motion.div>
+              </MotionVStack>
+            </Box>
+    </div>
+  );
+}
+
+function QuotesSection({ quoteIndex, setQuoteIndex }: { quoteIndex: number; setQuoteIndex: (i: number) => void }) {
+  const { ref, progress } = useSectionProgress();
+          const quoteY = useTransform(progress, [0, 1], [30, -30]);
+          const quotemarkY = useTransform(progress, [0, 1], [50, -50]);
+          const quoteScale = useTransform(progress, [0, 0.5, 1], [0.97, 1, 0.97]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <Box py={{ base: 12, md: 20 }} px={4}>
+        <VStack gap={6} maxW="650px" mx="auto" textAlign="center" minH="180px" justify="center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 1 }}
+            style={{ y: quotemarkY }}
+          >
+            <svg
+              width="32"
+              height="24"
+              viewBox="0 0 32 24"
+              fill="none"
+            >
+              <path
+                d="M0 24V14.4C0 10.4 0.8 7.2 2.4 4.8C4.13 2.4 6.67 0.8 10 0L11.6 3.2C9.73 3.73 8.27 4.67 7.2 6C6.13 7.2 5.53 8.67 5.4 10.4H10V24H0ZM18 24V14.4C18 10.4 18.8 7.2 20.4 4.8C22.13 2.4 24.67 0.8 28 0L29.6 3.2C27.73 3.73 26.27 4.67 25.2 6C24.13 7.2 23.53 8.67 23.4 10.4H28V24H18Z"
+                fill="rgba(201, 168, 76, 0.15)"
+              />
+            </svg>
+          </motion.div>
+
+          <motion.div style={{ y: quoteY, scale: quoteScale }}>
+          <Box position="relative" minH="120px" display="flex" alignItems="center">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={quoteIndex}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Text
+                  color="parchment.200"
+                  fontSize={{ base: "md", md: "xl" }}
+                  lineHeight="2"
+                  fontFamily="var(--font-cormorant), Georgia, serif"
+                  fontStyle="italic"
+                  fontWeight="300"
+                  letterSpacing="0.02em"
+                >
+                  &laquo;{quotes[quoteIndex].text}&raquo;
+                </Text>
+                <Text
+                  color="dark.300"
+                  fontSize="xs"
+                  mt={4}
+                  fontFamily="var(--font-jetbrains), monospace"
+                  fontWeight="300"
+                  letterSpacing="0.1em"
+                >
+                  — {quotes[quoteIndex].source}
+                </Text>
+              </motion.div>
+            </AnimatePresence>
+          </Box>
+          </motion.div>
+
+          {/* Dots indicator */}
+          <Flex gap={2} justify="center">
+            {quotes.map((_, i) => (
+              <motion.div
+                key={i}
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  cursor: "pointer",
+                  background:
+                    i === quoteIndex
+                      ? "rgba(201, 168, 76, 0.6)"
+                      : "rgba(201, 168, 76, 0.15)",
+                }}
+                animate={{
+                  scale: i === quoteIndex ? 1.3 : 1,
+                  background:
+                    i === quoteIndex
+                      ? "rgba(201, 168, 76, 0.6)"
+                      : "rgba(201, 168, 76, 0.15)",
+                }}
+                transition={{ duration: 0.3 }}
+                onClick={() => setQuoteIndex(i)}
+                whileHover={{ scale: 1.5 }}
+              />
+            ))}
+          </Flex>
+        </VStack>
+      </Box>
+    </div>
+  );
+}
+
+function StructureSection() {
+  const { ref, progress } = useSectionProgress();
+          const hexY = useTransform(progress, [0, 1], [60, -60]);
+          const hexRotate = useTransform(progress, [0, 1], [-5, 5]);
+          const titleY4 = useTransform(progress, [0, 1], [30, -30]);
+          const cardsY = useTransform(progress, [0, 1], [50, -20]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <Box py={{ base: 16, md: 24 }} px={4}>
+        <MotionVStack
+          gap={{ base: 10, md: 16 }}
+          maxW="900px"
+          mx="auto"
+          textAlign="center"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          variants={stagger(0.15)}
+        >
+          <motion.div variants={scrollFadeInUp} style={{ y: titleY4 }}>
+            <Text
+              color="dark.300"
+              fontSize="10px"
+              fontWeight="500"
+              textTransform="uppercase"
+              letterSpacing="0.3em"
+              fontFamily="var(--font-jetbrains), monospace"
+              mb={3}
+            >
+              Архитектура
+            </Text>
+            <Heading
+              as="h2"
+              fontSize={{ base: "2xl", md: "4xl" }}
+              color="brand.300"
+              fontFamily="var(--font-cormorant), Georgia, serif"
+              fontWeight="400"
+              letterSpacing="0.04em"
+            >
+              Устройство Библиотеки
+            </Heading>
+          </motion.div>
+
+          {/* Hex grid illustration — floats with parallax */}
+          <motion.div
+            variants={scrollFadeInUp}
+            style={{ display: "flex", justifyContent: "center", y: hexY, rotate: hexRotate }}
+          >
+            <HexGrid />
+          </motion.div>
+
+          {/* Structure cards */}
+          <motion.div style={{ y: cardsY, width: "100%" }}>
+          <Flex
+            gap={{ base: 4, md: 6 }}
+            wrap="wrap"
+            justify="center"
+            w="100%"
+          >
+            {[
+              {
+                icon: "⬡",
+                title: "Шестигранная галерея",
+                text: "Каждая галерея имеет шесть стен. Пять из них заняты полками; шестая ведёт в вестибюль — к зеркалу, винтовой лестнице и соседней галерее.",
+              },
+              {
+                icon: "▐",
+                title: "5 стен по 7 полок",
+                text: "На каждой стене — семь полок, на каждой полке — тридцать один том единообразного формата.",
+              },
+              {
+                icon: "◰",
+                title: "421 страница",
+                text: "Каждый том содержит четыреста двадцать одну страницу, на каждой — четыре тысячи восемьсот девятнадцать знаков.",
+              },
+              {
+                icon: "∞",
+                title: "Все возможные книги",
+                text: "Библиотека содержит все возможные комбинации 36 символов. Каждая мыслимая книга уже написана.",
+              },
+            ].map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{
+                  delay: i * 0.1,
+                  duration: 0.6,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                whileHover={{
+                  y: -4,
+                  transition: { duration: 0.25 },
+                }}
+                style={{
+                  flex: "1 1 200px",
+                  maxWidth: 220,
+                }}
+              >
+                <Box
+                  bg="rgba(17, 17, 25, 0.4)"
+                  border="1px solid"
+                  borderColor="rgba(201, 168, 76, 0.08)"
+                  borderRadius="10px"
+                  p={6}
+                  h="100%"
+                  transition="border-color 0.3s ease"
+                  _hover={{ borderColor: "rgba(201, 168, 76, 0.2)" }}
+                >
+                  <VStack gap={3} align="center">
+                    <Text
+                      fontSize="2xl"
+                      color="brand.300"
+                      fontFamily="var(--font-cormorant), Georgia, serif"
+                    >
+                      {item.icon}
+                    </Text>
+                    <Text
+                      color="parchment.200"
+                      fontSize="sm"
+                      fontWeight="500"
+                      fontFamily="var(--font-cormorant), Georgia, serif"
+                      letterSpacing="0.03em"
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      color="dark.200"
+                      fontSize="xs"
+                      lineHeight="1.7"
+                      fontFamily="var(--font-cormorant), Georgia, serif"
+                    >
+                      {item.text}
+                    </Text>
+                  </VStack>
+                </Box>
+              </motion.div>
+            ))}
+          </Flex>
+          </motion.div>
+        </MotionVStack>
+      </Box>
+    </div>
+  );
+}
+
+function NumbersSection() {
+  const { ref, progress } = useSectionProgress();
+          const titleY5 = useTransform(progress, [0, 1], [25, -25]);
+          const numbersY = useTransform(progress, [0, 1], [40, -20]);
+          const totalY = useTransform(progress, [0, 1], [50, -30]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <Box py={{ base: 16, md: 24 }} px={4}>
+        <MotionVStack
+          gap={{ base: 10, md: 14 }}
+          maxW="800px"
+          mx="auto"
+          textAlign="center"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          variants={stagger(0.12)}
+        >
+          <motion.div variants={scrollFadeInUp} style={{ y: titleY5 }}>
+            <Text
+              color="dark.300"
+              fontSize="10px"
+              fontWeight="500"
+              textTransform="uppercase"
+              letterSpacing="0.3em"
+              fontFamily="var(--font-jetbrains), monospace"
+              mb={3}
+            >
+              Масштаб
+            </Text>
+            <Heading
+              as="h2"
+              fontSize={{ base: "2xl", md: "4xl" }}
+              color="brand.300"
+              fontFamily="var(--font-cormorant), Georgia, serif"
+              fontWeight="400"
+              letterSpacing="0.04em"
+            >
+              Числа бесконечности
+            </Heading>
+          </motion.div>
+
+          <motion.div style={{ y: numbersY, width: "100%" }}>
+          <Flex
+            gap={{ base: 6, md: 10 }}
+            wrap="wrap"
+            justify="center"
+            w="100%"
+          >
+            {[
+              { value: 36, suffix: "", label: "символов алфавита", note: "33 буквы, пробел, запятая и точка" },
+              { value: 4819, suffix: "", label: "знаков на странице", note: "каждая страница — уникальная точка в пространстве всех текстов" },
+              { value: 421, suffix: "", label: "страница в томе", note: "и у каждого тома есть своё заглавие" },
+              { value: 1085, suffix: "", label: "томов в галерее", note: "5 стен × 7 полок × 31 том" },
+            ].map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ delay: i * 0.12, duration: 0.6 }}
+                style={{ flex: "1 1 180px", maxWidth: 200 }}
+              >
+                <VStack gap={2}>
+                  <Text
+                    color="brand.300"
+                    fontSize={{ base: "3xl", md: "4xl" }}
+                    fontWeight="300"
+                    fontFamily="var(--font-cormorant), Georgia, serif"
+                    lineHeight="1"
+                  >
+                    <AnimatedCounter target={stat.value} suffix={stat.suffix} />
+                  </Text>
+                  <Text
+                    color="parchment.200"
+                    fontSize="sm"
+                    fontWeight="400"
+                    fontFamily="var(--font-cormorant), Georgia, serif"
+                  >
+                    {stat.label}
+                  </Text>
+                  <Text
+                    color="dark.300"
+                    fontSize="10px"
+                    lineHeight="1.5"
+                    fontFamily="var(--font-jetbrains), monospace"
+                    fontWeight="300"
+                    maxW="160px"
+                  >
+                    {stat.note}
+                  </Text>
+                </VStack>
+              </motion.div>
+            ))}
+          </Flex>
+          </motion.div>
+
+          {/* Grand total */}
+          <motion.div variants={scrollFadeInUp} style={{ y: totalY }}>
+            <Box
+              bg="rgba(201, 168, 76, 0.03)"
+              border="1px solid"
+              borderColor="rgba(201, 168, 76, 0.1)"
+              borderRadius="12px"
+              px={{ base: 6, md: 10 }}
+              py={{ base: 6, md: 8 }}
+            >
+              <Text
+                color="dark.200"
+                fontSize="sm"
+                fontFamily="var(--font-cormorant), Georgia, serif"
+                fontStyle="italic"
+                mb={3}
+              >
+                Число различных страниц в Библиотеке:
+              </Text>
+              <Text
+                color="brand.300"
+                fontSize={{ base: "lg", md: "xl" }}
+                fontFamily="var(--font-jetbrains), monospace"
+                fontWeight="300"
+                letterSpacing="0.05em"
+                wordBreak="break-all"
+              >
+                36<sup>4819</sup>
+              </Text>
+              <Text
+                color="dark.300"
+                fontSize="xs"
+                fontFamily="var(--font-jetbrains), monospace"
+                fontWeight="300"
+                mt={2}
+              >
+                ≈ 6.6 × 10<sup>7499</sup> — у Борхеса, с 25 символами и 410 страницами, книг было 25<sup>1 312 000</sup>
+              </Text>
+            </Box>
+          </motion.div>
+        </MotionVStack>
+      </Box>
+    </div>
+  );
+}
+
+function ExploreSection({ handleRandom, loading }: { handleRandom: () => void; loading: boolean }) {
+  const { ref, progress } = useSectionProgress();
+          const titleY6 = useTransform(progress, [0, 1], [30, -30]);
+          const cardsY6 = useTransform(progress, [0, 1], [50, -15]);
+          const ctaY = useTransform(progress, [0, 1], [40, -20]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <Box py={{ base: 16, md: 24 }} px={4}>
+        <VStack gap={{ base: 10, md: 14 }} maxW="1000px" mx="auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7 }}
+            style={{ textAlign: "center", y: titleY6 }}
+          >
+            <Text
+              color="dark.300"
+              fontSize="10px"
+              fontWeight="500"
+              textTransform="uppercase"
+              letterSpacing="0.3em"
+              fontFamily="var(--font-jetbrains), monospace"
+              mb={3}
+            >
+              Навигация
+            </Text>
+            <Heading
+              as="h2"
+              fontSize={{ base: "2xl", md: "4xl" }}
+              color="brand.300"
+              fontFamily="var(--font-cormorant), Georgia, serif"
+              fontWeight="400"
+              letterSpacing="0.04em"
+            >
+              Исследуйте Библиотеку
+            </Heading>
+          </motion.div>
+
+          <motion.div style={{ y: cardsY6, width: "100%" }}>
+          <Flex gap={{ base: 4, md: 6 }} wrap="wrap" justify="center" w="100%">
+            <NavCard
+              title="Поиск текста"
+              description="Найдите любой текст, когда-либо написанный или ещё не написанный. Каждая мысль уже записана на одной из страниц."
+              href="/"
+              icon={<SearchIcon />}
+              delay={0}
+            />
+            <NavCard
+              title="Обзор полок"
+              description="Выберите стену, полку, том и страницу. Перемещайтесь по библиотеке как библиотекарь Борхеса."
+              href="/browse"
+              icon={<BookIcon />}
+              delay={0.1}
+            />
+            <NavCard
+              title="3D Галерея"
+              description="Войдите в шестигранную галерею и осмотрите полки в трёхмерном пространстве. Ощутите масштаб бесконечности."
+              href="/explore/wall/1"
+              icon={<CubeIcon />}
+              delay={0.2}
+            />
+          </Flex>
+          </motion.div>
+
+          {/* Random page CTA */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+            style={{ textAlign: "center", y: ctaY }}
+          >
+            <motion.button
+              onClick={handleRandom}
+              disabled={loading}
+              style={{
+                background: "transparent",
+                border: "1px solid rgba(201, 168, 76, 0.2)",
+                color: "rgba(201, 168, 76, 0.7)",
+                padding: "14px 36px",
+                borderRadius: "8px",
+                cursor: loading ? "wait" : "pointer",
+                fontFamily: "var(--font-cormorant), Georgia, serif",
+                fontSize: "18px",
+                fontWeight: 400,
+                letterSpacing: "0.08em",
+                transition: "all 0.3s ease",
+              }}
+              whileHover={{
+                borderColor: "rgba(201, 168, 76, 0.5)",
+                color: "rgba(240, 228, 201, 1)",
+                boxShadow: "0 0 30px rgba(201, 168, 76, 0.08)",
+                y: -2,
+              }}
+              whileTap={{ scale: 0.97 }}
+            >
+              {loading ? "Открываем..." : "✦  Случайная страница  ✦"}
+            </motion.button>
+          </motion.div>
+        </VStack>
+      </Box>
+    </div>
+  );
+}
+
+function HowItWorksSection() {
+  const { ref, progress } = useSectionProgress();
+          const titleY7 = useTransform(progress, [0, 1], [25, -25]);
+          const stepsY = useTransform(progress, [0, 1], [40, -15]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <Box py={{ base: 16, md: 24 }} px={4}>
+        <MotionVStack
+          gap={{ base: 10, md: 14 }}
+          maxW="700px"
+          mx="auto"
+          textAlign="center"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          variants={stagger(0.12)}
+        >
+          <motion.div variants={scrollFadeInUp} style={{ y: titleY7 }}>
+            <Text
+              color="dark.300"
+              fontSize="10px"
+              fontWeight="500"
+              textTransform="uppercase"
+              letterSpacing="0.3em"
+              fontFamily="var(--font-jetbrains), monospace"
+              mb={3}
+            >
+              Алгоритм
+            </Text>
+            <Heading
+              as="h2"
+              fontSize={{ base: "2xl", md: "4xl" }}
+              color="brand.300"
+              fontFamily="var(--font-cormorant), Georgia, serif"
+              fontWeight="400"
+              letterSpacing="0.04em"
+            >
+              Как это работает
+            </Heading>
+          </motion.div>
+
+          <motion.div style={{ y: stepsY, width: "100%" }}>
+          <VStack gap={8} w="100%" align="stretch">
+            {[
+              {
+                step: "I",
+                title: "Адресация",
+                text: "Каждая страница имеет уникальный адрес — длинное шестнадцатеричное число, определяющее галерею, стену, полку, том и страницу.",
+              },
+              {
+                step: "II",
+                title: "Детерминизм",
+                text: "Содержимое страницы полностью определяется её адресом. Один и тот же адрес всегда ведёт к одному и тому же тексту.",
+              },
+              {
+                step: "III",
+                title: "Обратимость",
+                text: "Любой текст можно найти — алгоритм вычисляет точный адрес, на котором записан введённый текст.",
+              },
+              {
+                step: "IV",
+                title: "Полнота",
+                text: "Каждая возможная комбинация символов существует. Вы не создаёте текст — вы находите его в бесконечной библиотеке.",
+              },
+            ].map((item, i) => (
+              <motion.div
+                key={item.step}
+                initial={{ opacity: 0, x: i % 2 === 0 ? -30 : 30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{
+                  delay: i * 0.1,
+                  duration: 0.7,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+              >
+                <Flex
+                  gap={5}
+                  align="flex-start"
+                  textAlign="left"
+                  bg="rgba(17, 17, 25, 0.3)"
+                  border="1px solid"
+                  borderColor="rgba(201, 168, 76, 0.06)"
+                  borderRadius="10px"
+                  p={{ base: 5, md: 6 }}
+                  transition="border-color 0.3s ease"
+                  _hover={{ borderColor: "rgba(201, 168, 76, 0.15)" }}
+                >
+                  <Text
+                    color="brand.300"
+                    fontSize={{ base: "xl", md: "2xl" }}
+                    fontFamily="var(--font-cormorant), Georgia, serif"
+                    fontWeight="300"
+                    minW="40px"
+                    opacity={0.5}
+                  >
+                    {item.step}
+                  </Text>
+                  <VStack gap={1} align="flex-start">
+                    <Text
+                      color="parchment.200"
+                      fontSize="md"
+                      fontWeight="500"
+                      fontFamily="var(--font-cormorant), Georgia, serif"
+                      letterSpacing="0.03em"
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      color="dark.200"
+                      fontSize="sm"
+                      lineHeight="1.7"
+                      fontFamily="var(--font-cormorant), Georgia, serif"
+                    >
+                      {item.text}
+                    </Text>
+                  </VStack>
+                </Flex>
+              </motion.div>
+            ))}
+          </VStack>
+          </motion.div>
+        </MotionVStack>
+      </Box>
+    </div>
+  );
+}
+
+function FinalQuoteSection() {
+  const { ref, progress } = useSectionProgress();
+          const finalY = useTransform(progress, [0, 1], [30, -20]);
+          const finalScale = useTransform(progress, [0, 0.5, 1], [0.96, 1, 0.98]);
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <Box py={{ base: 16, md: 24 }} px={4}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.5 }}
+          style={{ y: finalY, scale: finalScale }}
+        >
+          <VStack gap={6} maxW="600px" mx="auto" textAlign="center">
+            <AnimatedOrnament />
+            <Text
+              color="parchment.200"
+              fontSize={{ base: "lg", md: "2xl" }}
+              lineHeight="2"
+              fontFamily="var(--font-cormorant), Georgia, serif"
+              fontStyle="italic"
+              fontWeight="300"
+            >
+              &laquo;Библиотека безгранична и периодична. Если бы вечный
+              странник пустился в путь в каком-либо направлении, он мог бы
+              убедиться по прошествии веков, что те же книги повторяются в
+              том же беспорядке, который, повторяясь, становится порядком:
+              Порядком.&raquo;
+            </Text>
+            <Text
+              color="dark.300"
+              fontSize="xs"
+              fontFamily="var(--font-jetbrains), monospace"
+              fontWeight="300"
+              letterSpacing="0.1em"
+            >
+              — Хорхе Луис Борхес, 1941
+            </Text>
+          </VStack>
+        </motion.div>
+      </Box>
+    </div>
   );
 }
 
@@ -435,6 +1113,20 @@ export default function Home() {
     <PageTransition>
       {/* ═══ SECTION 1: HERO ═══ */}
       <Box ref={heroRef} position="relative" minH="100vh" overflow="hidden">
+        {/* Painted galleries behind the title */}
+        <motion.div
+          style={{ position: "absolute", inset: 0, y: heroParallaxSlow, scale: heroGlowScale }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 2.4, ease: "easeOut" }}
+        >
+          <Image src="/textures/hero.webp" alt="" fill priority sizes="100vw" style={{ objectFit: "cover", objectPosition: "center 40%", opacity: 0.32 }} />
+          <Box
+            position="absolute"
+            inset={0}
+            bg="linear-gradient(180deg, rgba(8,8,15,0.55) 0%, rgba(8,8,15,0.25) 35%, rgba(8,8,15,0.65) 75%, #08080f 100%), radial-gradient(ellipse 70% 60% at 50% 45%, rgba(8,8,15,0) 0%, rgba(8,8,15,0.6) 100%)"
+          />
+        </motion.div>
         {/* Radial glow behind title */}
         <motion.div
           style={{
@@ -588,748 +1280,35 @@ export default function Home() {
       </Box>
 
       {/* ═══ SECTION 2: SEARCH ═══ */}
-      <ParallaxSection>
-        {(progress) => {
-          const titleY = useTransform(progress, [0, 1], [40, -40]);
-          const searchY = useTransform(progress, [0, 1], [60, -20]);
-          return (
-            <Box py={{ base: 16, md: 24 }} px={4}>
-              <MotionVStack
-                gap={8}
-                maxW="700px"
-                mx="auto"
-                textAlign="center"
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-80px" }}
-                variants={stagger(0.12)}
-              >
-                <motion.div variants={scrollFadeInUp} style={{ y: titleY }}>
-                  <Text
-                    color="dark.300"
-                    fontSize="10px"
-                    fontWeight="500"
-                    textTransform="uppercase"
-                    letterSpacing="0.3em"
-                    fontFamily="var(--font-jetbrains), monospace"
-                    mb={3}
-                  >
-                    Найти в бесконечности
-                  </Text>
-                  <Heading
-                    as="h2"
-                    fontSize={{ base: "2xl", md: "4xl" }}
-                    color="brand.300"
-                    fontFamily="var(--font-cormorant), Georgia, serif"
-                    fontWeight="400"
-                    letterSpacing="0.04em"
-                  >
-                    Поиск по Библиотеке
-                  </Heading>
-                </motion.div>
-
-                <motion.div style={{ y: titleY }}>
-                  <MotionText
-                    color="dark.200"
-                    fontSize={{ base: "md", md: "lg" }}
-                    lineHeight="1.8"
-                    maxW="500px"
-                    fontFamily="var(--font-cormorant), Georgia, serif"
-                    fontStyle="italic"
-                    variants={scrollFadeInUp}
-                  >
-                    Введите любой текст — и Библиотека укажет точную страницу, на которой
-                    он записан, среди бесконечных томов.
-                  </MotionText>
-                </motion.div>
-
-                <motion.div variants={scrollFadeInUp} style={{ width: "100%", y: searchY }}>
-                  <SearchBar />
-                </motion.div>
-              </MotionVStack>
-            </Box>
-          );
-        }}
-      </ParallaxSection>
+      <SearchSection />
 
       <SectionOrnament />
 
       {/* ═══ SECTION 3: ROTATING QUOTES ═══ */}
-      <ParallaxSection>
-        {(progress) => {
-          const quoteY = useTransform(progress, [0, 1], [30, -30]);
-          const quotemarkY = useTransform(progress, [0, 1], [50, -50]);
-          const quoteScale = useTransform(progress, [0, 0.5, 1], [0.97, 1, 0.97]);
-          return (
-      <Box py={{ base: 12, md: 20 }} px={4}>
-        <VStack gap={6} maxW="650px" mx="auto" textAlign="center" minH="180px" justify="center">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 1 }}
-            style={{ y: quotemarkY }}
-          >
-            <svg
-              width="32"
-              height="24"
-              viewBox="0 0 32 24"
-              fill="none"
-            >
-              <path
-                d="M0 24V14.4C0 10.4 0.8 7.2 2.4 4.8C4.13 2.4 6.67 0.8 10 0L11.6 3.2C9.73 3.73 8.27 4.67 7.2 6C6.13 7.2 5.53 8.67 5.4 10.4H10V24H0ZM18 24V14.4C18 10.4 18.8 7.2 20.4 4.8C22.13 2.4 24.67 0.8 28 0L29.6 3.2C27.73 3.73 26.27 4.67 25.2 6C24.13 7.2 23.53 8.67 23.4 10.4H28V24H18Z"
-                fill="rgba(201, 168, 76, 0.15)"
-              />
-            </svg>
-          </motion.div>
-
-          <motion.div style={{ y: quoteY, scale: quoteScale }}>
-          <Box position="relative" minH="120px" display="flex" alignItems="center">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={quoteIndex}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <Text
-                  color="parchment.200"
-                  fontSize={{ base: "md", md: "xl" }}
-                  lineHeight="2"
-                  fontFamily="var(--font-cormorant), Georgia, serif"
-                  fontStyle="italic"
-                  fontWeight="300"
-                  letterSpacing="0.02em"
-                >
-                  &laquo;{quotes[quoteIndex].text}&raquo;
-                </Text>
-                <Text
-                  color="dark.300"
-                  fontSize="xs"
-                  mt={4}
-                  fontFamily="var(--font-jetbrains), monospace"
-                  fontWeight="300"
-                  letterSpacing="0.1em"
-                >
-                  — {quotes[quoteIndex].source}
-                </Text>
-              </motion.div>
-            </AnimatePresence>
-          </Box>
-          </motion.div>
-
-          {/* Dots indicator */}
-          <Flex gap={2} justify="center">
-            {quotes.map((_, i) => (
-              <motion.div
-                key={i}
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  cursor: "pointer",
-                  background:
-                    i === quoteIndex
-                      ? "rgba(201, 168, 76, 0.6)"
-                      : "rgba(201, 168, 76, 0.15)",
-                }}
-                animate={{
-                  scale: i === quoteIndex ? 1.3 : 1,
-                  background:
-                    i === quoteIndex
-                      ? "rgba(201, 168, 76, 0.6)"
-                      : "rgba(201, 168, 76, 0.15)",
-                }}
-                transition={{ duration: 0.3 }}
-                onClick={() => setQuoteIndex(i)}
-                whileHover={{ scale: 1.5 }}
-              />
-            ))}
-          </Flex>
-        </VStack>
-      </Box>
-          );
-        }}
-      </ParallaxSection>
+      <QuotesSection quoteIndex={quoteIndex} setQuoteIndex={setQuoteIndex}/>
 
       <SectionOrnament />
 
       {/* ═══ SECTION 4: STRUCTURE OF THE LIBRARY ═══ */}
-      <ParallaxSection>
-        {(progress) => {
-          const hexY = useTransform(progress, [0, 1], [60, -60]);
-          const hexRotate = useTransform(progress, [0, 1], [-5, 5]);
-          const titleY4 = useTransform(progress, [0, 1], [30, -30]);
-          const cardsY = useTransform(progress, [0, 1], [50, -20]);
-          return (
-      <Box py={{ base: 16, md: 24 }} px={4}>
-        <MotionVStack
-          gap={{ base: 10, md: 16 }}
-          maxW="900px"
-          mx="auto"
-          textAlign="center"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          variants={stagger(0.15)}
-        >
-          <motion.div variants={scrollFadeInUp} style={{ y: titleY4 }}>
-            <Text
-              color="dark.300"
-              fontSize="10px"
-              fontWeight="500"
-              textTransform="uppercase"
-              letterSpacing="0.3em"
-              fontFamily="var(--font-jetbrains), monospace"
-              mb={3}
-            >
-              Архитектура
-            </Text>
-            <Heading
-              as="h2"
-              fontSize={{ base: "2xl", md: "4xl" }}
-              color="brand.300"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontWeight="400"
-              letterSpacing="0.04em"
-            >
-              Устройство Библиотеки
-            </Heading>
-          </motion.div>
-
-          {/* Hex grid illustration — floats with parallax */}
-          <motion.div
-            variants={scrollFadeInUp}
-            style={{ display: "flex", justifyContent: "center", y: hexY, rotate: hexRotate }}
-          >
-            <HexGrid />
-          </motion.div>
-
-          {/* Structure cards */}
-          <motion.div style={{ y: cardsY, width: "100%" }}>
-          <Flex
-            gap={{ base: 4, md: 6 }}
-            wrap="wrap"
-            justify="center"
-            w="100%"
-          >
-            {[
-              {
-                icon: "⬡",
-                title: "Шестигранная галерея",
-                text: "Каждая галерея имеет шесть стен. Четыре стены заняты полками. Две свободные стены ведут в соседние галереи.",
-              },
-              {
-                icon: "▐",
-                title: "5 стен по 7 полок",
-                text: "На каждой стене пять полок, на каждой полке тридцать два тома единообразного формата.",
-              },
-              {
-                icon: "◰",
-                title: "410 страниц",
-                text: "Каждая книга содержит четыреста десять страниц, на каждой странице — сорок строк, в строке — около восьмидесяти символов.",
-              },
-              {
-                icon: "∞",
-                title: "Все возможные книги",
-                text: "Библиотека содержит все возможные комбинации 25 символов. Каждая мыслимая книга уже написана.",
-              },
-            ].map((item, i) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{
-                  delay: i * 0.1,
-                  duration: 0.6,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                whileHover={{
-                  y: -4,
-                  transition: { duration: 0.25 },
-                }}
-                style={{
-                  flex: "1 1 200px",
-                  maxWidth: 220,
-                }}
-              >
-                <Box
-                  bg="rgba(17, 17, 25, 0.4)"
-                  border="1px solid"
-                  borderColor="rgba(201, 168, 76, 0.08)"
-                  borderRadius="10px"
-                  p={6}
-                  h="100%"
-                  transition="border-color 0.3s ease"
-                  _hover={{ borderColor: "rgba(201, 168, 76, 0.2)" }}
-                >
-                  <VStack gap={3} align="center">
-                    <Text
-                      fontSize="2xl"
-                      color="brand.300"
-                      fontFamily="var(--font-cormorant), Georgia, serif"
-                    >
-                      {item.icon}
-                    </Text>
-                    <Text
-                      color="parchment.200"
-                      fontSize="sm"
-                      fontWeight="500"
-                      fontFamily="var(--font-cormorant), Georgia, serif"
-                      letterSpacing="0.03em"
-                    >
-                      {item.title}
-                    </Text>
-                    <Text
-                      color="dark.200"
-                      fontSize="xs"
-                      lineHeight="1.7"
-                      fontFamily="var(--font-cormorant), Georgia, serif"
-                    >
-                      {item.text}
-                    </Text>
-                  </VStack>
-                </Box>
-              </motion.div>
-            ))}
-          </Flex>
-          </motion.div>
-        </MotionVStack>
-      </Box>
-          );
-        }}
-      </ParallaxSection>
+      <StructureSection />
 
       <SectionOrnament />
 
       {/* ═══ SECTION 5: MIND-BENDING NUMBERS ═══ */}
-      <ParallaxSection>
-        {(progress) => {
-          const titleY5 = useTransform(progress, [0, 1], [25, -25]);
-          const numbersY = useTransform(progress, [0, 1], [40, -20]);
-          const totalY = useTransform(progress, [0, 1], [50, -30]);
-          return (
-      <Box py={{ base: 16, md: 24 }} px={4}>
-        <MotionVStack
-          gap={{ base: 10, md: 14 }}
-          maxW="800px"
-          mx="auto"
-          textAlign="center"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          variants={stagger(0.12)}
-        >
-          <motion.div variants={scrollFadeInUp} style={{ y: titleY5 }}>
-            <Text
-              color="dark.300"
-              fontSize="10px"
-              fontWeight="500"
-              textTransform="uppercase"
-              letterSpacing="0.3em"
-              fontFamily="var(--font-jetbrains), monospace"
-              mb={3}
-            >
-              Масштаб
-            </Text>
-            <Heading
-              as="h2"
-              fontSize={{ base: "2xl", md: "4xl" }}
-              color="brand.300"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontWeight="400"
-              letterSpacing="0.04em"
-            >
-              Числа бесконечности
-            </Heading>
-          </motion.div>
-
-          <motion.div style={{ y: numbersY, width: "100%" }}>
-          <Flex
-            gap={{ base: 6, md: 10 }}
-            wrap="wrap"
-            justify="center"
-            w="100%"
-          >
-            {[
-              { value: 29, suffix: "", label: "символов алфавита", note: "22 буквы, пробел, запятая, точка, тире и перенос строки" },
-              { value: 1312000, suffix: "", label: "символов на странице", note: "3200 символов × 410 страниц в каждом томе" },
-              { value: 32, suffix: "", label: "тома на полке", note: "одинакового формата и одинакового объёма" },
-              { value: 1120, suffix: "", label: "полок в галерее", note: "5 стен × 7 полок × 32 тома" },
-            ].map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ delay: i * 0.12, duration: 0.6 }}
-                style={{ flex: "1 1 180px", maxWidth: 200 }}
-              >
-                <VStack gap={2}>
-                  <Text
-                    color="brand.300"
-                    fontSize={{ base: "3xl", md: "4xl" }}
-                    fontWeight="300"
-                    fontFamily="var(--font-cormorant), Georgia, serif"
-                    lineHeight="1"
-                  >
-                    <AnimatedCounter target={stat.value} suffix={stat.suffix} />
-                  </Text>
-                  <Text
-                    color="parchment.200"
-                    fontSize="sm"
-                    fontWeight="400"
-                    fontFamily="var(--font-cormorant), Georgia, serif"
-                  >
-                    {stat.label}
-                  </Text>
-                  <Text
-                    color="dark.300"
-                    fontSize="10px"
-                    lineHeight="1.5"
-                    fontFamily="var(--font-jetbrains), monospace"
-                    fontWeight="300"
-                    maxW="160px"
-                  >
-                    {stat.note}
-                  </Text>
-                </VStack>
-              </motion.div>
-            ))}
-          </Flex>
-          </motion.div>
-
-          {/* Grand total */}
-          <motion.div variants={scrollFadeInUp} style={{ y: totalY }}>
-            <Box
-              bg="rgba(201, 168, 76, 0.03)"
-              border="1px solid"
-              borderColor="rgba(201, 168, 76, 0.1)"
-              borderRadius="12px"
-              px={{ base: 6, md: 10 }}
-              py={{ base: 6, md: 8 }}
-            >
-              <Text
-                color="dark.200"
-                fontSize="sm"
-                fontFamily="var(--font-cormorant), Georgia, serif"
-                fontStyle="italic"
-                mb={3}
-              >
-                Общее число книг в Библиотеке:
-              </Text>
-              <Text
-                color="brand.300"
-                fontSize={{ base: "lg", md: "xl" }}
-                fontFamily="var(--font-jetbrains), monospace"
-                fontWeight="300"
-                letterSpacing="0.05em"
-                wordBreak="break-all"
-              >
-                25<sup>1312000</sup>
-              </Text>
-              <Text
-                color="dark.300"
-                fontSize="xs"
-                fontFamily="var(--font-jetbrains), monospace"
-                fontWeight="300"
-                mt={2}
-              >
-                ≈ 1.956 × 10<sup>1834097</sup>
-              </Text>
-            </Box>
-          </motion.div>
-        </MotionVStack>
-      </Box>
-          );
-        }}
-      </ParallaxSection>
+      <NumbersSection />
 
       <SectionOrnament />
 
       {/* ═══ SECTION 6: EXPLORE THE LIBRARY ═══ */}
-      <ParallaxSection>
-        {(progress) => {
-          const titleY6 = useTransform(progress, [0, 1], [30, -30]);
-          const cardsY6 = useTransform(progress, [0, 1], [50, -15]);
-          const ctaY = useTransform(progress, [0, 1], [40, -20]);
-          return (
-      <Box py={{ base: 16, md: 24 }} px={4}>
-        <VStack gap={{ base: 10, md: 14 }} maxW="1000px" mx="auto">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7 }}
-            style={{ textAlign: "center", y: titleY6 }}
-          >
-            <Text
-              color="dark.300"
-              fontSize="10px"
-              fontWeight="500"
-              textTransform="uppercase"
-              letterSpacing="0.3em"
-              fontFamily="var(--font-jetbrains), monospace"
-              mb={3}
-            >
-              Навигация
-            </Text>
-            <Heading
-              as="h2"
-              fontSize={{ base: "2xl", md: "4xl" }}
-              color="brand.300"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontWeight="400"
-              letterSpacing="0.04em"
-            >
-              Исследуйте Библиотеку
-            </Heading>
-          </motion.div>
-
-          <motion.div style={{ y: cardsY6, width: "100%" }}>
-          <Flex gap={{ base: 4, md: 6 }} wrap="wrap" justify="center" w="100%">
-            <NavCard
-              title="Поиск текста"
-              description="Найдите любой текст, когда-либо написанный или ещё не написанный. Каждая мысль уже записана на одной из страниц."
-              href="/"
-              icon={<SearchIcon />}
-              delay={0}
-            />
-            <NavCard
-              title="Обзор полок"
-              description="Выберите стену, полку, том и страницу. Перемещайтесь по библиотеке как библиотекарь Борхеса."
-              href="/browse"
-              icon={<BookIcon />}
-              delay={0.1}
-            />
-            <NavCard
-              title="3D Галерея"
-              description="Войдите в шестигранную галерею и осмотрите полки в трёхмерном пространстве. Ощутите масштаб бесконечности."
-              href="/explore/wall/1"
-              icon={<CubeIcon />}
-              delay={0.2}
-            />
-          </Flex>
-          </motion.div>
-
-          {/* Random page CTA */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            style={{ textAlign: "center", y: ctaY }}
-          >
-            <motion.button
-              onClick={handleRandom}
-              disabled={loading}
-              style={{
-                background: "transparent",
-                border: "1px solid rgba(201, 168, 76, 0.2)",
-                color: "rgba(201, 168, 76, 0.7)",
-                padding: "14px 36px",
-                borderRadius: "8px",
-                cursor: loading ? "wait" : "pointer",
-                fontFamily: "var(--font-cormorant), Georgia, serif",
-                fontSize: "18px",
-                fontWeight: 400,
-                letterSpacing: "0.08em",
-                transition: "all 0.3s ease",
-              }}
-              whileHover={{
-                borderColor: "rgba(201, 168, 76, 0.5)",
-                color: "rgba(240, 228, 201, 1)",
-                boxShadow: "0 0 30px rgba(201, 168, 76, 0.08)",
-                y: -2,
-              }}
-              whileTap={{ scale: 0.97 }}
-            >
-              {loading ? "Открываем..." : "✦  Случайная страница  ✦"}
-            </motion.button>
-          </motion.div>
-        </VStack>
-      </Box>
-          );
-        }}
-      </ParallaxSection>
+      <ExploreSection handleRandom={handleRandom} loading={loading}/>
 
       <SectionOrnament />
 
       {/* ═══ SECTION 7: HOW IT WORKS ═══ */}
-      <ParallaxSection>
-        {(progress) => {
-          const titleY7 = useTransform(progress, [0, 1], [25, -25]);
-          const stepsY = useTransform(progress, [0, 1], [40, -15]);
-          return (
-      <Box py={{ base: 16, md: 24 }} px={4}>
-        <MotionVStack
-          gap={{ base: 10, md: 14 }}
-          maxW="700px"
-          mx="auto"
-          textAlign="center"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          variants={stagger(0.12)}
-        >
-          <motion.div variants={scrollFadeInUp} style={{ y: titleY7 }}>
-            <Text
-              color="dark.300"
-              fontSize="10px"
-              fontWeight="500"
-              textTransform="uppercase"
-              letterSpacing="0.3em"
-              fontFamily="var(--font-jetbrains), monospace"
-              mb={3}
-            >
-              Алгоритм
-            </Text>
-            <Heading
-              as="h2"
-              fontSize={{ base: "2xl", md: "4xl" }}
-              color="brand.300"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontWeight="400"
-              letterSpacing="0.04em"
-            >
-              Как это работает
-            </Heading>
-          </motion.div>
-
-          <motion.div style={{ y: stepsY, width: "100%" }}>
-          <VStack gap={8} w="100%" align="stretch">
-            {[
-              {
-                step: "I",
-                title: "Адресация",
-                text: "Каждая страница имеет уникальный адрес — длинное шестнадцатеричное число, определяющее галерею, стену, полку, том и страницу.",
-              },
-              {
-                step: "II",
-                title: "Детерминизм",
-                text: "Содержимое страницы полностью определяется её адресом. Один и тот же адрес всегда ведёт к одному и тому же тексту.",
-              },
-              {
-                step: "III",
-                title: "Обратимость",
-                text: "Любой текст можно найти — алгоритм вычисляет точный адрес, на котором записан введённый текст.",
-              },
-              {
-                step: "IV",
-                title: "Полнота",
-                text: "Каждая возможная комбинация символов существует. Вы не создаёте текст — вы находите его в бесконечной библиотеке.",
-              },
-            ].map((item, i) => (
-              <motion.div
-                key={item.step}
-                initial={{ opacity: 0, x: i % 2 === 0 ? -30 : 30 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{
-                  delay: i * 0.1,
-                  duration: 0.7,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-              >
-                <Flex
-                  gap={5}
-                  align="flex-start"
-                  textAlign="left"
-                  bg="rgba(17, 17, 25, 0.3)"
-                  border="1px solid"
-                  borderColor="rgba(201, 168, 76, 0.06)"
-                  borderRadius="10px"
-                  p={{ base: 5, md: 6 }}
-                  transition="border-color 0.3s ease"
-                  _hover={{ borderColor: "rgba(201, 168, 76, 0.15)" }}
-                >
-                  <Text
-                    color="brand.300"
-                    fontSize={{ base: "xl", md: "2xl" }}
-                    fontFamily="var(--font-cormorant), Georgia, serif"
-                    fontWeight="300"
-                    minW="40px"
-                    opacity={0.5}
-                  >
-                    {item.step}
-                  </Text>
-                  <VStack gap={1} align="flex-start">
-                    <Text
-                      color="parchment.200"
-                      fontSize="md"
-                      fontWeight="500"
-                      fontFamily="var(--font-cormorant), Georgia, serif"
-                      letterSpacing="0.03em"
-                    >
-                      {item.title}
-                    </Text>
-                    <Text
-                      color="dark.200"
-                      fontSize="sm"
-                      lineHeight="1.7"
-                      fontFamily="var(--font-cormorant), Georgia, serif"
-                    >
-                      {item.text}
-                    </Text>
-                  </VStack>
-                </Flex>
-              </motion.div>
-            ))}
-          </VStack>
-          </motion.div>
-        </MotionVStack>
-      </Box>
-          );
-        }}
-      </ParallaxSection>
+      <HowItWorksSection />
 
       {/* ═══ FINAL QUOTE ═══ */}
-      <ParallaxSection>
-        {(progress) => {
-          const finalY = useTransform(progress, [0, 1], [30, -20]);
-          const finalScale = useTransform(progress, [0, 0.5, 1], [0.96, 1, 0.98]);
-          return (
-      <Box py={{ base: 16, md: 24 }} px={4}>
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 1.5 }}
-          style={{ y: finalY, scale: finalScale }}
-        >
-          <VStack gap={6} maxW="600px" mx="auto" textAlign="center">
-            <AnimatedOrnament />
-            <Text
-              color="parchment.200"
-              fontSize={{ base: "lg", md: "2xl" }}
-              lineHeight="2"
-              fontFamily="var(--font-cormorant), Georgia, serif"
-              fontStyle="italic"
-              fontWeight="300"
-            >
-              &laquo;Библиотека безгранична и периодична. Если бы вечный
-              странник пустился в путь в каком-либо направлении, он мог бы
-              убедиться по прошествии веков, что те же книги повторяются в
-              том же беспорядке, который, повторяясь, становится порядком:
-              Порядком.&raquo;
-            </Text>
-            <Text
-              color="dark.300"
-              fontSize="xs"
-              fontFamily="var(--font-jetbrains), monospace"
-              fontWeight="300"
-              letterSpacing="0.1em"
-            >
-              — Хорхе Луис Борхес, 1941
-            </Text>
-          </VStack>
-        </motion.div>
-      </Box>
-          );
-        }}
-      </ParallaxSection>
+      <FinalQuoteSection />
 
       <Box h={16} />
     </PageTransition>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Box, Flex, Heading, Link as ChakraLink, Button, Spinner, Text } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import NextLink from "next/link";
 import { fadeIn } from "@/lib/animations";
 
@@ -38,15 +38,16 @@ export default function Header() {
       backdropFilter="blur(16px)"
       borderBottom="1px solid"
       borderColor="brand.300/10"
+      h="var(--header-h)"
     >
       <Box className="glow-line" />
       <MotionFlex
         maxW="1200px"
         mx="auto"
+        h="100%"
         align="center"
         justify="space-between"
-        px={6}
-        py={4}
+        px={{ base: 4, md: 6 }}
         variants={fadeIn}
         initial="hidden"
         animate="visible"
@@ -60,19 +61,21 @@ export default function Header() {
             >
               <Flex align="baseline" gap={3}>
                 <Heading
-                  size="lg"
+                  size={{ base: "md", md: "lg" }}
                   color="brand.300"
                   fontFamily="var(--font-cormorant), Georgia, serif"
                   fontWeight="600"
                   letterSpacing="0.08em"
+                  whiteSpace="nowrap"
                 >
-                  Вавилонская Библиотека
+                  <Box as="span" display={{ base: "none", sm: "inline" }}>Вавилонская </Box>Библиотека
                 </Heading>
                 <Text
                   color="brand.300/30"
                   fontSize="xs"
                   fontFamily="var(--font-jetbrains), monospace"
                   fontWeight="300"
+                  display={{ base: "none", md: "block" }}
                 >
                   v.∞
                 </Text>
