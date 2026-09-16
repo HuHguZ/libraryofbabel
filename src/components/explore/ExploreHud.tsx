@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Flex, Text, Link as ChakraLink, chakra } from "@chakra-ui/react";
+import { Box, Flex, Text, Link as ChakraLink, chakra, useClipboard } from "@chakra-ui/react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -46,6 +46,8 @@ export interface ExploreHudProps {
   children?: ReactNode;
   /** Extra layers (panels, drawers) rendered above the scene. */
   extra?: ReactNode;
+  /** Width taken by a panel along the right edge (from md up): the bottom row centres in the space left of it. */
+  rightPanel?: string | null;
 }
 
 const lastPointer = { x: -1000, y: -1000 };
@@ -163,6 +165,7 @@ export default function ExploreHud({
   banner,
   children,
   extra,
+  rightPanel,
 }: ExploreHudProps) {
   const t = useTranslations("Explore");
   return (
@@ -208,7 +211,20 @@ export default function ExploreHud({
       </Flex>
 
       {/* Bottom row */}
-      <Flex position="absolute" bottom={0} left={0} right={0} direction="column" align="center" gap={3} px={4} pb={{ base: 4, md: 6 }} zIndex={5} pointerEvents="none">
+      <Flex
+        position="absolute"
+        bottom={0}
+        left={0}
+        right={{ base: 0, md: rightPanel ?? 0 }}
+        transition="right 0.3s ease-out"
+        direction="column"
+        align="center"
+        gap={3}
+        px={4}
+        pb={{ base: 4, md: 6 }}
+        zIndex={5}
+        pointerEvents="none"
+      >
         <AnimatePresence>
           {hint && showHint && (
             <motion.div key="hint" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.5 }}>
@@ -335,5 +351,23 @@ export function HudButton({ children, onClick, active, disabled, title }: { chil
     >
       {children}
     </chakra.button>
+  );
+}
+
+/** A HUD button that copies `value` and says so for a couple of seconds. */
+export function HudCopyButton({ value, label, copiedLabel, title, onCopy }: { value: string; label: ReactNode; copiedLabel: ReactNode; title?: string; onCopy?: () => void }) {
+  const clipboard = useClipboard({ value, timeout: 2000 });
+  return (
+    <HudButton
+      active={clipboard.copied}
+      disabled={!value}
+      title={title}
+      onClick={() => {
+        clipboard.copy();
+        onCopy?.();
+      }}
+    >
+      {clipboard.copied ? copiedLabel : label}
+    </HudButton>
   );
 }

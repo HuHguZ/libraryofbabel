@@ -1,13 +1,75 @@
 "use client";
 
-import { Box, Highlight } from "@chakra-ui/react";
+import { useMemo } from "react";
+import { Box } from "@chakra-ui/react";
+import { findMatches } from "@/lib/alphabet";
+import { DEFAULT_FRAGMENT_COLOR, FRAGMENT_ALPHA, fragmentWash } from "@/lib/fragmentColor";
+
+const MATCH_WASH = "rgba(201, 168, 76, 0.35)";
+/** The occurrence the reader is at; the 3D book draws it in the same colour. */
+const CURRENT_WASH = "rgba(232, 118, 22, 0.55)";
+const INK = "#2a1f0e";
 
 interface BookPageProps {
   content: string;
+  /** Phrase to highlight, already in the Library's alphabet. */
   highlight?: string;
+  /** Fragment to mark: character offsets into `content`, the end exclusive. */
+  mark?: { start: number; end: number } | null;
+  /**
+   * A new selection is being made over the text: the old mark steps back. Only an attribute changes,
+   * so the text nodes (and the selection in them) stay untouched.
+   */
+  selecting?: boolean;
+  /** Page number, so a selection in the text can be traced back to its page. */
+  page?: number;
+  /** Start of the occurrence of the phrase the reader is at, if it is on this page. */
+  current?: number | null;
+  /** The reader's fragment colour ("#rrggbb"): the mark and the selection are washed in it; the 3D book uses it too. */
+  fragmentColor?: string;
 }
 
-export default function BookPage({ content, highlight }: BookPageProps) {
+interface Segment {
+  text: string;
+  match: boolean;
+  current: boolean;
+  mark: boolean;
+}
+
+/** Cuts the text wherever a search match or the mark begins or ends. */
+export function segmentText(content: string, query: string, mark: BookPageProps["mark"], current: number | null = null): Segment[] {
+  const matches = findMatches(content, query);
+  const cuts = new Set([0, content.length]);
+  for (const s of matches) {
+    cuts.add(s);
+    cuts.add(Math.min(content.length, s + query.length));
+  }
+  const from = mark ? Math.max(0, Math.min(content.length, mark.start)) : 0;
+  const to = mark ? Math.max(from, Math.min(content.length, mark.end)) : 0;
+  if (to > from) {
+    cuts.add(from);
+    cuts.add(to);
+  }
+  const bounds = [...cuts].sort((a, b) => a - b);
+  const out: Segment[] = [];
+  let m = 0;
+  for (let i = 0; i + 1 < bounds.length; i++) {
+    const a = bounds[i];
+    while (m < matches.length && matches[m] + query.length <= a) m++;
+    const match = m < matches.length && matches[m] <= a;
+    const isCurrent = match && matches[m] === current;
+    const marked = a >= from && a < to;
+    const last = out[out.length - 1];
+    const text = content.slice(a, bounds[i + 1]);
+    if (last && last.match === match && last.current === isCurrent && last.mark === marked) last.text += text;
+    else out.push({ text, match, current: isCurrent, mark: marked });
+  }
+  return out;
+}
+
+export default function BookPage({ content, highlight, mark, selecting, page, current = null, fragmentColor = DEFAULT_FRAGMENT_COLOR }: BookPageProps) {
+  const segments = useMemo(() => segmentText(content, highlight ?? "", mark, current), [content, highlight, mark, current]);
+  const tint = { wash: fragmentWash(fragmentColor, FRAGMENT_ALPHA.panel), selection: fragmentWash(fragmentColor, FRAGMENT_ALPHA.selection) };
   return (
     <Box position="relative" maxW="900px" mx="auto">
       {/* Outer glow */}
@@ -98,6 +160,9 @@ export default function BookPage({ content, highlight }: BookPageProps) {
         />
 
         <Box
+          // PAGE_TEXT_ATTR: a selection is traced back to its page by this attribute.
+          data-page-text={page}
+          data-selecting={selecting || undefined}
           fontFamily="var(--font-jetbrains), 'Courier New', monospace"
           fontSize={{ base: "11px", md: "13px" }}
           lineHeight="29px"
@@ -108,24 +173,32 @@ export default function BookPage({ content, highlight }: BookPageProps) {
           zIndex={1}
           letterSpacing="0.01em"
           fontWeight="400"
+          // The pages are meant to be copied, even on the 3D stage, which turns selection off for everything else.
+          userSelect="text"
+          cursor="text"
+          css={{
+            "&::selection": { bg: tint.selection, color: INK },
+            "& *::selection": { bg: tint.selection, color: INK },
+            // A found sentence can be longer than a line; the marks wrap with the text.
+            "& mark": { bg: "transparent", color: "inherit", whiteSpace: "pre-wrap" },
+            "& mark[data-match]": { bg: MATCH_WASH, color: INK, px: "2px", borderRadius: "2px", boxShadow: "0 0 4px rgba(201, 168, 76, 0.2)" },
+            "& mark[data-fragment]": { bg: tint.wash, color: INK },
+            // Where a search match falls inside the fragment, both washes show, one over the other.
+            "& mark[data-match][data-fragment]": { background: `linear-gradient(${MATCH_WASH}, ${MATCH_WASH}), ${tint.wash}` },
+            "& mark[data-current]": { bg: CURRENT_WASH },
+            "& mark[data-current][data-fragment]": { background: `linear-gradient(${CURRENT_WASH}, ${CURRENT_WASH}), ${tint.wash}` },
+            "&[data-selecting] mark[data-fragment]": { bg: "transparent", boxShadow: "none" },
+            "&[data-selecting] mark[data-match][data-fragment]": { bg: MATCH_WASH },
+          }}
         >
-          {highlight ? (
-            <Highlight
-              query={highlight}
-              styles={{
-                bg: "rgba(201, 168, 76, 0.35)",
-                color: "#2a1f0e",
-                px: "2px",
-                borderRadius: "2px",
-                boxShadow: "0 0 4px rgba(201, 168, 76, 0.2)",
-                // A found sentence can be longer than a line; Chakra's mark would not wrap otherwise.
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {content}
-            </Highlight>
-          ) : (
-            content
+          {segments.map((s, i) =>
+            s.match || s.mark ? (
+              <mark key={i} data-match={s.match || undefined} data-current={s.current || undefined} data-fragment={s.mark || undefined}>
+                {s.text}
+              </mark>
+            ) : (
+              s.text
+            )
           )}
         </Box>
       </Box>
