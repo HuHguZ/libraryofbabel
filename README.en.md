@@ -68,11 +68,24 @@ The galleries never end. Beyond the door is a vestibule with a spiral staircase,
 
 ## Books
 
-Every shelf holds 31 volumes with a title on the spine; every volume has 421 pages. An open book reads like a real one: turn the pages, lean in, search the spread for a phrase.
+Every shelf holds 31 volumes with a title on the spine; every volume has 421 pages. An open book reads like a real one: turn the pages, lean over a page and run your eye along the lines, search the spread for a phrase. Turn quickly and the pages fan out, several in the air at once, and no two leaves turn alike.
 
 <p align="center">
-  <img src="docs/screenshots/flip.webp" alt="A page of the book turning over with a curl" width="100%" />
+  <img src="docs/screenshots/flip.webp" alt="Leaves of the book turning over one after another, each bending its own way" width="100%" />
 </p>
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/riffle.webp" alt="Fast page turning: the leaves fan out forward and back" />
+      <br><sub><b>Fanning out.</b> Turn quickly and several pages are in the air at once.</sub>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/read.webp" alt="The camera flies to a corner of the page and runs along the lines" />
+      <br><sub><b>Over the page.</b> The wheel flies to the spot under the cursor; the mouse and <code>W A S D</code> carry your eye along the lines.</sub>
+    </td>
+  </tr>
+</table>
 
 <table>
   <tr>
@@ -107,14 +120,14 @@ Just as Borges described it:
  │ address │ → │ 1 — 5 │ → │ 1 — 7 │ → │ 1 — 31 │ → │ 1 — 421 │
  └─────────┘   └───────┘   └───────┘   └────────┘   └─────────┘
 
-  every page holds 4,819 characters of a 50-symbol alphabet:
-  26 lowercase Latin letters, 10 digits, the space
-  and 13 punctuation marks  . , ! ? : ; - — … ( ) " '
+  every page holds 4,819 characters of a 98-symbol alphabet:
+  52 Latin letters of both cases, 10 digits, the space,
+  the line break and 34 marks: all of printable ASCII and — …
 ```
 
-The English Library has 50<sup>4819</sup> ≈ 2.2 × 10<sup>8187</sup> distinct pages. Borges' alphabet was more modest: 22 letters, the space, the comma and the full stop.
+The English Library has 98<sup>4819</sup> ≈ 5.2 × 10<sup>9595</sup> distinct pages. Borges' alphabet was more modest: 22 letters, the space, the comma and the full stop. Ours has everything links, keys and code are written with, so you can find a proxy key or a JavaScript function in it, capitals, indentation, line breaks and all.
 
-A gallery address is a string of digits and Latin letters in both cases (62 "digits", one for every character of a page). Every address leads to a gallery of its own, and that gallery always holds the same books. The galleries and shelves in the screenshots above come from the gallery at address `babel`.
+A gallery address is a string of digits and Latin letters in both cases (62 "digits"). Every address leads to a gallery of its own, and that gallery always holds the same books. The galleries and shelves in the screenshots above come from the gallery at address `babel`.
 
 ## Two languages, two Libraries
 
@@ -127,11 +140,11 @@ The `RU | EN` switch on the right of the header translates the whole site: the m
 | | Russian Library | English Library |
 |---|---|---|
 | URLs | `/`, `/page/…`, `/explore/…` | `/en`, `/en/page/…`, `/en/explore/…` |
-| Letters | 33 lowercase Russian | 26 lowercase Latin |
-| Digits, space | 10 and the space | 10 and the space |
-| Punctuation | `. , ! ? : ; - — … ( ) « » " '` | `. , ! ? : ; - — … ( ) " '` |
-| Symbols in all | 59 | 50 |
-| Distinct pages | 59<sup>4819</sup> ≈ 5.4 × 10<sup>8533</sup> | 50<sup>4819</sup> ≈ 2.2 × 10<sup>8187</sup> |
+| Letters | 33 Russian and 26 Latin, lower and upper case | 26 Latin, lower and upper case |
+| Digits, spacing | 10, the space and the line break | 10, the space and the line break |
+| Marks | all of printable ASCII and `— … « »` | all of printable ASCII and `— …` |
+| Symbols in all | 166 | 98 |
+| Distinct pages | 166<sup>4819</sup> ≈ 5.0 × 10<sup>10698</sup> | 98<sup>4819</sup> ≈ 5.2 × 10<sup>9595</sup> |
 
 The same address holds different text in the two Libraries, so the language is part of the link: a link to an English page opens the English page even for someone who has chosen Russian. Your choice is remembered and used on the home page; on the very first visit the home page follows your browser's language.
 
@@ -149,12 +162,17 @@ The same address holds different text in the two Libraries, so the language is p
 
 **3D walk** &mdash; an endless first-person world of galleries, shelves with titled spines, open volumes and a reader with page turning.
 
-You can search for whole sentences with punctuation and numbers. Capital letters become lowercase, typographic variants are brought into the alphabet (`“ ”` → `"`, `–` → `—`), and symbols the Library does not have are dropped. The search box shows in advance what will actually be searched for.
+**Copy and share a fragment** &mdash; the &ldquo;text & address&rdquo; panel beside the open book shows the text of the spread: copy a whole page with one button, or select a few lines and copy a link to them. The link opens the same spread with the panel already open and the fragment marked, both in the text and on the page of the 3D book, and the camera glides over to it. While you select, the book marks the same characters. The mark can take any colour: the swatch next to &ldquo;fragment&rdquo; opens a colour picker with ready-made colours, and your choice is remembered in the browser.
+
+The search box takes several lines: `Enter` searches, `Shift+Enter` starts a new line, and you can paste a poem or a piece of code. Case, spaces and line breaks are kept as they are, a tab becomes four spaces, typographic variants are brought into the alphabet (`“ ”` → `"`, `–` → `—`), and symbols the Library does not have (emoji, say) are dropped. The search box shows in advance what will actually be searched for.
+
+The Library is not a safe: a page's address is its text, written reversibly by an open algorithm. Whoever has the link can read the key that lies on the page.
 
 ## Controls
 
 | Where | To | Do |
 |-------|----|----|
+| Search on the home page | search / new line in the query | `Enter` / `Shift+Enter` |
 | Gallery | take the mouse (crosshair in the centre) | click the scene |
 | | release the cursor | `Esc` |
 | | walk / run / jump | `W A S D` or arrow keys / `Shift` / space |
@@ -163,8 +181,15 @@ You can search for whole sentences with punctuation and numbers. Capital letters
 | Shelf | open a volume | click its spine |
 | Volume | open a page | click its number in the index |
 | Reader | turn pages | `←` `→`, `PageUp` `PageDown` or click a page |
+| | move over the book | drag with the mouse or `W A S D` (`Shift` to hurry) |
+| | fly to a spot on the page | mouse wheel towards the cursor, `↑` `↓` closer and farther |
+| | tilt the book / see the whole book | right mouse button / `Home` |
 | | find on the spread | the &ldquo;find on the page&rdquo; box |
+| | next / previous match | `Enter` / `Shift+Enter` or the `↓` `↑` arrows by the counter |
+| | copy a page / share a fragment | &ldquo;text & address&rdquo;, then &ldquo;copy text&rdquo; / select text and &ldquo;link to fragment&rdquo; |
+| | change the highlight colour | the colour swatch in the fragment bar |
 | Phone | look around / walk | one finger / two fingers |
+| | in the reader: move over the book / zoom and tilt | one finger / two fingers |
 | Anywhere | change the language | the `RU \| EN` switch in the header |
 
 Where the browser allows pointer lock, it is used. Where it does not, such as embedded preview panes and sandboxes, the cursor is hidden, the free mouse steers the view, and it keeps turning while the cursor rests at the edge of the screen.
@@ -182,16 +207,20 @@ Open `http://localhost:3000/en`, or go straight to the gallery from the screensh
 npm run build && npm start   # production build
 npm run lint                 # eslint (flat config)
 npm run typecheck            # tsc --noEmit
+npm test                     # tests (Vitest)
 ```
 
 ## Under the hood
 
 - **An endless world.** Two galleries share one vestibule, the pairs repeat floor after floor, and the spiral staircase makes one full turn per floor. The neighbouring galleries (through the door, above and below) stay in the scene with their own materials, while distant floors are lightweight copies. The number of lights never changes, so no shader is recompiled as you walk on.
 - **Determinism.** The addresses of neighbouring galleries are derived from the starting one, so the way back leads to the same books. A gallery's look &mdash; floor, walls, ceiling, shelf wood, leather and binding colours &mdash; is picked from its address too.
-- **A reversible algorithm.** Every character of a page is one "digit" of the address, shifted by a pseudo-random keystream seeded from the wall, shelf, volume and page. Shifts are taken modulo the size of the alphabet, so one address scheme serves both the 59-symbol Russian and the 50-symbol English Library: search writes a text into an address, reading brings it back (`src/lib/babel.ts`; the alphabets live in `src/lib/alphabet.ts`).
+- **A reversible algorithm.** Every character of a page is shifted by a pseudo-random keystream seeded from the wall, shelf, volume and page, and the shifted characters are written as address "digits" in blocks: 4 characters of the Russian Library as 5 digits, 7 characters of the English one as 8. A block is read as one number, so a page address takes at most 6,024 characters, only 1% over the theoretical minimum for 62 digits. Search writes a text into an address, reading brings it back (`src/lib/babel.ts`; the packing is in `src/lib/library.ts`, the alphabets in `src/lib/alphabet.ts`).
+- **Long links.** An address plus the search phrase `q` can run to tens of kilobytes, and Node rejects requests with headers over 16 KB by default (error 431). `.npmrc` raises that limit for `npm run dev` and `npm start`.
+- **Line breaks on the 3D page.** A line ends where the text breaks and wraps after 80 characters. When that makes more than 61 lines, the type gets smaller and the lines longer, just enough for the whole text to fit the leaf (`layoutPage` in `src/components/explore/bookPages.ts`).
 - **Internationalization** with [next-intl](https://next-intl.dev): translations in `messages/ru.json` and `messages/en.json`, routes under a `[locale]` segment, Russian without a prefix. `src/proxy.ts` detects the language on the home page only; every other link is never redirected to another language.
 - **Textures** (`public/textures`) were generated locally in ComfyUI with the Z-Image Turbo model.
-- **The reader** draws pages onto canvas textures, highlights matches and bends the turning page right in the vertices of its geometry.
+- **The reader** draws pages onto canvas textures ahead of time, a few spreads either way, and uploads them to the GPU at once, so a turning leaf already has text on its back. Every leaf moves on its own (`src/components/explore/leaves.ts`): the next one lifts once the one before is a little ahead, and a long queue is flipped as a bunch. The bend is computed in the vertices of the geometry as a spring, and every turn draws a character of its own (speed, stiffness, which corner leads, the ripple along the edge).
+- **Links to fragments** look like `/page/<address>?text=12:160-240`: the page, then character offsets into its 4,819-character text (the end exclusive), next to the search phrase `q` if there is one. A selection in the panel is turned into these offsets by measuring the text from the start of the page up to each end of the selection, so search highlights splitting the text into pieces do not get in the way (`src/lib/fragment.ts`).
 
 ## Stack
 
