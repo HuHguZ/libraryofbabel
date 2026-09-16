@@ -1,6 +1,6 @@
-import { DIGS, LIBRARY } from "./library";
+import { DIGS, MAX_ADDRESS_LENGTH } from "./library";
 
-export function generateRandomHex(length: number = LIBRARY.pageLength): string {
+export function generateRandomHex(length: number = MAX_ADDRESS_LENGTH): string {
   let hex = "";
   for (let i = 0; i < length; i++) {
     hex += DIGS[Math.floor(Math.random() * DIGS.length)];
@@ -45,7 +45,7 @@ export function cellHex(worldHex: string, level: number, side: "a" | "b"): strin
   if (level === 0 && side === "a") return worldHex;
   const rand = createRandom(hashString(`${worldHex}#${level}#${side}`));
   let hex = "";
-  for (let i = 0; i < LIBRARY.pageLength; i++) {
+  for (let i = 0; i < MAX_ADDRESS_LENGTH; i++) {
     hex += DIGS[Math.floor(rand() * DIGS.length)];
   }
   return hex;

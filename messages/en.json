@@ -64,13 +64,13 @@
       "pagesTitle": "{pages, plural, one {# page} other {# pages}}",
       "pagesText": "Every volume has four hundred and twenty-one pages, each of them four thousand eight hundred and nineteen characters long.",
       "booksTitle": "Every possible book",
-      "booksText": "The Library holds every possible combination of {symbols, plural, one {# symbol} other {# symbols}}: letters, digits, the space and punctuation marks. Every conceivable book has already been written."
+      "booksText": "The Library holds every possible combination of {symbols, plural, one {# symbol} other {# symbols}}: letters of both cases, digits, the space, the line break and punctuation marks. Every conceivable book has already been written."
     },
     "numbers": {
       "kicker": "Scale",
       "title": "The numbers of infinity",
       "alphabet": "{count, plural, one {symbol in the alphabet} other {symbols in the alphabet}}",
-      "alphabetNote": "{letters, plural, one {# letter} other {# letters}}, {digits, plural, one {# digit} other {# digits}}, the space and {marks, plural, one {# punctuation mark} other {# punctuation marks}}",
+      "alphabetNote": "{letters, plural, one {# letter} other {# letters}} of both cases, {digits, plural, one {# digit} other {# digits}}, the space, the line break and {marks, plural, one {# mark} other {# marks}}",
       "pageLength": "{count, plural, one {character per page} other {characters per page}}",
       "pageLengthNote": "every page is a unique point in the space of all texts",
       "pages": "{count, plural, one {page per volume} other {pages per volume}}",
@@ -114,7 +114,7 @@
     "modeSearch": "Search",
     "modeExact": "Exact",
     "modeTitle": "Title",
-    "alphabetHint": "The Library holds only lowercase English letters, digits, the space and punctuation marks",
+    "alphabetHint": "The Library holds English letters of both cases, digits, the space, the line break and ASCII marks",
     "foreign": " — <mark>{symbols}</mark> cannot be found",
     "willSearch": "Searching for: <phrase>“{query}”</phrase>",
     "typeInAlphabet": "Type your text in English letters."

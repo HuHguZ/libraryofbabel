@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import type { BabelConfig, BabelLibrary } from "./types";
 import { ALPHABETS, normalizeText } from "./alphabet";
-import { DIGS, LIBRARY } from "./library";
+import { DIGS, LIBRARY, addressPacking, digitsFor } from "./library";
 import { defaultLocale, isLocale, type Locale } from "@/i18n/locales";
 
 const DEFAULT_CONFIG: BabelConfig = {
@@ -52,47 +52,92 @@ function pad(s: string, size: number): string {
 }
 
 /**
- * A Library over `config.alphabet`. Every symbol of a page is one digit of the address, shifted by
- * a keystream seeded from the location (wall, shelf, volume, page), so the mapping works both ways:
- * `search` writes a text into an address, `getPage` reads it back. Shifts are taken modulo the size
- * of the alphabet, which may be smaller than the number of digits.
+ * A Library over `config.alphabet`. Every symbol of a page is shifted by a keystream seeded from the
+ * location (wall, shelf, volume, page) and the shifted symbols are written as address digits, a block
+ * at a time (see `addressPacking`), so the mapping works both ways: `search` writes a text into an
+ * address, `getPage` reads it back.
  */
 export function createBabel(config?: Partial<BabelConfig>): BabelLibrary {
   const cfg: BabelConfig = { ...DEFAULT_CONFIG, ...config };
   const { digs, alphabet, lengthOfPage, lengthOfTitle } = cfg;
   const size = alphabet.length;
-  if (size > digs.length) throw new Error(`an alphabet of ${size} symbols needs at least as many digits`);
+  const base = digs.length;
+  const { chars: blockChars, digits: blockDigits } = addressPacking(size, base);
 
   const digsIndexes: Record<string, number> = {};
   const alphabetIndexes: Record<string, number> = {};
 
-  for (let i = 0; i < digs.length; i++) {
+  for (let i = 0; i < base; i++) {
     digsIndexes[digs[i]] = i;
   }
   for (let i = 0; i < size; i++) {
     alphabetIndexes[alphabet[i]] = i;
   }
 
+  /** Symbols held by a short last block of `width` digits: the most whose block is no wider. */
+  const tailChars = Array.from({ length: blockDigits }, (_, width) => {
+    let chars = 0;
+    while (chars + 1 < blockChars && digitsFor(size, chars + 1, base) <= width) chars++;
+    return chars;
+  });
+
+  /** Writes symbol numbers as digits: `blockDigits` digits for every `blockChars` symbols, fewer for the rest. */
+  const pack = (symbols: number[]): string => {
+    let hex = "";
+    for (let at = 0; at < symbols.length; at += blockChars) {
+      const count = Math.min(blockChars, symbols.length - at);
+      const width = count === blockChars ? blockDigits : digitsFor(size, count, base);
+      let value = 0;
+      for (let i = at; i < at + count; i++) value = value * size + symbols[i];
+      // A block of digits can count past the symbols it holds, and every such value reads the same;
+      // landing on one of them at random makes a found address look like any other.
+      const span = size ** count;
+      value += span * Math.floor(Math.random() * (Math.floor((base ** width - 1 - value) / span) + 1));
+      let block = "";
+      for (let i = 0; i < width; i++) {
+        block = digs[value % base] + block;
+        value = Math.floor(value / base);
+      }
+      hex += block;
+    }
+    return hex;
+  };
+
+  /** Reads digits back into symbol numbers (any string of digits reads as something). */
+  const unpack = (hex: string): number[] => {
+    const symbols: number[] = [];
+    for (let at = 0; at < hex.length; at += blockDigits) {
+      const width = Math.min(blockDigits, hex.length - at);
+      const count = width === blockDigits ? blockChars : tailChars[width];
+      let value = 0;
+      for (let i = at; i < at + width; i++) value = value * base + (digsIndexes[hex[i]] ?? 0);
+      value %= size ** count;
+      const run: number[] = new Array(count);
+      for (let i = count - 1; i >= 0; i--) {
+        run[i] = value % size;
+        value = Math.floor(value / size);
+      }
+      symbols.push(...run);
+    }
+    return symbols;
+  };
+
   /** Writes `text` (already in the alphabet) as digits under the keystream of `locHash`. */
   const encode = (text: string, locHash: number): string => {
     const rng = createRng(locHash);
-    let hex = "";
+    const symbols: number[] = new Array(text.length);
     for (let i = 0; i < text.length; i++) {
-      let digit = mod((alphabetIndexes[text[i]] ?? 0) + Math.floor(rng.next(0, size)), size);
-      // Digits past the alphabet's size read as the same symbols; using them too makes found
-      // addresses look like any other.
-      if (digit + size < digs.length && Math.random() < 0.5) digit += size;
-      hex += digs[digit];
+      symbols[i] = mod((alphabetIndexes[text[i]] ?? 0) + Math.floor(rng.next(0, size)), size);
     }
-    return hex;
+    return pack(symbols);
   };
 
   /** Reads the digits of `hex` back into symbols under the keystream of `locHash`, padded to `length`. */
   const decode = (hex: string, locHash: number, length: number): string => {
     const rng = createRng(locHash);
     let result = "";
-    for (let i = 0; i < hex.length; i++) {
-      result += alphabet[mod((digsIndexes[hex[i]] ?? 0) - Math.floor(rng.next(0, size)), size)];
+    for (const symbol of unpack(hex)) {
+      result += alphabet[mod(symbol - Math.floor(rng.next(0, size)), size)];
     }
     const rng2 = createRng(getHash(result));
     while (result.length < length) {
@@ -105,8 +150,8 @@ export function createBabel(config?: Partial<BabelConfig>): BabelLibrary {
     config: cfg,
 
     search(searchStr: string): string {
-      // Only the Library's own symbols can be encoded. Spaces stay as they are: exact search pads with them.
-      searchStr = normalizeText(searchStr, alphabet, false).slice(0, lengthOfPage);
+      // Only the Library's own symbols can be encoded.
+      searchStr = normalizeText(searchStr, alphabet).slice(0, lengthOfPage);
       const w = `${((Math.random() * cfg.wall + 1) ^ 0)}`;
       const sh = `${((Math.random() * cfg.shelf + 1) ^ 0)}`;
       const vol = pad(`${((Math.random() * cfg.volume + 1) ^ 0)}`, 2);

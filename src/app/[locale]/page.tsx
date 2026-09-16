@@ -693,7 +693,7 @@ function NumbersSection() {
                 value: symbols,
                 suffix: "",
                 label: t("alphabet", { count: symbols }),
-                note: t("alphabetNote", { letters: parts.letters.length, digits: parts.digits.length, marks: parts.punctuation.length }),
+                note: t("alphabetNote", { letters: parts.letters.length, latin: parts.latin.length, digits: parts.digits.length, marks: parts.punctuation.length }),
               },
               { value: LIBRARY.pageLength, suffix: "", label: t("pageLength", { count: LIBRARY.pageLength }), note: t("pageLengthNote") },
               { value: LIBRARY.pages, suffix: "", label: t("pages", { count: LIBRARY.pages }), note: t("pagesNote") },
