@@ -9,6 +9,7 @@ import { AnimatePresence } from "motion/react";
 import PageTransition from "@/components/PageTransition";
 import ExploreHud, { ExploreStage, HudButton } from "@/components/explore/ExploreHud";
 import ReaderTextPanel from "@/components/explore/ReaderTextPanel";
+import { useLoupe } from "@/components/explore/loupe/useLoupe";
 import { useLocalizedPath, useRouter } from "@/i18n/navigation";
 import { normalizeQuery } from "@/lib/alphabet";
 import { formatFragment, fragmentReducer, parseFragment, shownFragment, type TextFragment } from "@/lib/fragment";
@@ -19,6 +20,7 @@ import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
 
 const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), { ssr: false });
 const ReaderScene = dynamic(() => import("@/components/explore/ReaderScene"), { ssr: false });
+const Loupe = dynamic(() => import("@/components/explore/loupe/Loupe"), { ssr: false });
 
 const mono = "var(--font-jetbrains), monospace";
 const serif = "var(--font-cormorant), Georgia, serif";
@@ -133,6 +135,7 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   const [tooltip, setTooltip] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(true);
   const [ready, setReady] = useState(false);
+  const loupe = useLoupe();
   const loadedRef = useRef(new Map<number, string>());
   const inFlightRef = useRef(new Set<number>());
 
@@ -322,6 +325,7 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
             onTurn={go}
             onInteract={() => setShowHint(false)}
           />
+          <Loupe active={loupe.active} />
         </SceneWrapper>
 
         <ExploreHud
@@ -336,7 +340,8 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
               <Box as="span" display={{ base: "none", md: "inline" }}>{t("hintDesktop")}</Box>
             </>
           }
-          tooltip={tooltip}
+          // The loupe stands in for the cursor: a tooltip beside it would cover the glass.
+          tooltip={loupe.active ? null : tooltip}
           rightPanel={textOpen ? "min(600px, 100%)" : null}
           extra={
             <AnimatePresence>
@@ -419,6 +424,9 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
                   {t("notOnSpread")}
                 </Text>
               ))}
+            <HudButton active={loupe.active} onClick={loupe.toggle} title={t("loupeTitle")}>
+              {t("loupe")}
+            </HudButton>
             <HudButton active={textOpen} onClick={() => setTextOpen((o) => !o)}>
               {t("textAndAddress")}
             </HudButton>

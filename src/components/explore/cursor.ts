@@ -1,22 +1,31 @@
 /**
  * Cursor helpers for the WebGL canvas (kept outside components so imperative hover code stays simple).
  * While the view is aimed from the screen centre (captured mouse), the canvas hides the cursor and the
- * scene raycasts from the reticle instead of the pointer.
+ * scene raycasts from the reticle instead of the pointer. While the loupe is in hand, it stands in for the cursor.
  */
 
 export function isCenterAim(canvas: HTMLCanvasElement): boolean {
   return canvas.dataset.aim === "center";
 }
 
+const loupeInHand = (canvas: HTMLCanvasElement) => canvas.dataset.loupe === "on";
+
 export function setCenterAim(canvas: HTMLCanvasElement, on: boolean) {
   if (on) canvas.dataset.aim = "center";
   else delete canvas.dataset.aim;
-  canvas.style.cursor = on ? "none" : "";
+  canvas.style.cursor = on || loupeInHand(canvas) ? "none" : "";
 }
 
-/** Sets the pointer cursor on the canvas (a captured mouse stays hidden). */
+/** Hides the cursor over the canvas while the loupe takes its place. */
+export function setLoupeCursor(canvas: HTMLCanvasElement, on: boolean) {
+  if (on) canvas.dataset.loupe = "on";
+  else delete canvas.dataset.loupe;
+  canvas.style.cursor = on || isCenterAim(canvas) ? "none" : "";
+}
+
+/** Sets the pointer cursor on the canvas (a captured mouse or the loupe keeps it hidden). */
 export function setCanvasCursor(canvas: HTMLCanvasElement, pointer: boolean) {
-  canvas.style.cursor = isCenterAim(canvas) ? "none" : pointer ? "pointer" : "";
+  canvas.style.cursor = isCenterAim(canvas) || loupeInHand(canvas) ? "none" : pointer ? "pointer" : "";
 }
 
 /** True on devices with a real mouse: the view can follow it shooter-style. */
