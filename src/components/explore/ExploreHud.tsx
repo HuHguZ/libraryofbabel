@@ -1,7 +1,8 @@
 "use client";
 
 import { Box, Flex, Text, Link as ChakraLink, chakra } from "@chakra-ui/react";
-import NextLink from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, type ReactNode } from "react";
 
@@ -163,6 +164,7 @@ export default function ExploreHud({
   children,
   extra,
 }: ExploreHudProps) {
+  const t = useTranslations("Explore");
   return (
     <>
       {/* Soft vignette so the chrome reads over any scene */}
@@ -178,7 +180,7 @@ export default function ExploreHud({
       <Flex position="absolute" top={0} left={0} right={0} px={{ base: 4, md: 6 }} pt={{ base: 3, md: 4 }} zIndex={5} align="flex-start" justify="space-between" pointerEvents="none">
         <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.2 }} style={{ pointerEvents: "auto" }}>
           <ChakraLink asChild color="dark.100" fontSize="sm" fontFamily={mono} fontWeight="300" letterSpacing="0.02em" _hover={{ color: "brand.300", textDecoration: "none" }}>
-            <NextLink href={back.href}>← {back.label}</NextLink>
+            <Link href={back.href}>← {back.label}</Link>
           </ChakraLink>
         </motion.div>
 
@@ -195,7 +197,7 @@ export default function ExploreHud({
           {galleryLabel && (
             <>
               <Text color="dark.200" fontSize="9px" textTransform="uppercase" letterSpacing="0.2em" fontFamily={mono} display={{ base: "none", sm: "block" }}>
-                галерея
+                {t("gallery")}
               </Text>
               <Text color="brand.200/70" fontSize="xs" fontFamily={mono} display={{ base: "none", sm: "block" }}>
                 {galleryLabel}
@@ -294,9 +296,9 @@ export function HudSelector({ items, active, hrefFor, onSelect, label }: { items
           </Box>
         );
         return hrefFor ? (
-          <NextLink key={n} href={hrefFor(n)} style={{ textDecoration: "none" }}>
+          <Link key={n} href={hrefFor(n)} style={{ textDecoration: "none" }}>
             {inner}
-          </NextLink>
+          </Link>
         ) : (
           <motion.div key={n} whileTap={{ scale: 0.94 }}>
             {inner}

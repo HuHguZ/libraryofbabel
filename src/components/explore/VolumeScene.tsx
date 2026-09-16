@@ -4,9 +4,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { useTranslations } from "next-intl";
+import { LIBRARY } from "@/lib/library";
 import { LAMP_COLOR, useLibraryMaterials } from "./materials";
 import { loadSerifFont } from "./textTexture";
-import { INDEX, INDEX_CANVAS, PAGE, indexCellCenter, indexCellFromUv, makeIndexPage, makeTitlePage } from "./bookPages";
+import { INDEX, INDEX_CANVAS, PAGE, indexCellCenter, indexCellFromUv, makeIndexPage, makeTitlePage, type TitlePageText } from "./bookPages";
 import { setCanvasCursor } from "./cursor";
 
 export interface VolumeSceneProps {
@@ -69,7 +71,31 @@ export function Bookmark({ y }: { y: number }) {
   );
 }
 
+/** What the title page of a volume says, in the current language. */
+export function useTitlePageText(title: string, wall: number, shelf: number, volume: number): TitlePageText {
+  const book = useTranslations("Book");
+  const common = useTranslations("Common");
+  return useMemo(
+    () => ({
+      title,
+      library: book("library"),
+      untitled: book("untitled"),
+      volume: common("volumeN", { n: volume }),
+      location: book("location", { wall, shelf }),
+      epigraph: book("epigraph"),
+      epigraphSource: book("epigraphSource"),
+    }),
+    [book, common, title, wall, shelf, volume]
+  );
+}
+
 export default function VolumeScene({ title, wall, shelf, volume, onHoverPage, onClickPage, onInteract }: VolumeSceneProps) {
+  const titleText = useTitlePageText(title, wall, shelf, volume);
+  const book = useTranslations("Book");
+  const indexText = useMemo(
+    () => ({ title: book("indexTitle"), subtitle: book("indexSubtitle", { pages: LIBRARY.pages, chars: LIBRARY.pageLength }) }),
+    [book]
+  );
   const materials = useLibraryMaterials();
   const gl = useThree((s) => s.gl);
   const [family, setFamily] = useState<string | null>(null);
@@ -93,10 +119,10 @@ export default function VolumeScene({ title, wall, shelf, volume, onHoverPage, o
   const pages = useMemo(() => {
     if (!family) return null;
     return {
-      left: makeTitlePage(family, materials.textures.parchment, { title, wall, shelf, volume }),
-      right: makeIndexPage(family, materials.textures.parchment),
+      left: makeTitlePage(family, materials.textures.parchment, titleText),
+      right: makeIndexPage(family, materials.textures.parchment, indexText),
     };
-  }, [family, materials, title, wall, shelf, volume]);
+  }, [family, materials, titleText, indexText]);
 
   useEffect(() => {
     return () => {

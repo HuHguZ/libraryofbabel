@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { Box, Input, Flex, Button, Spinner, Text } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import { foreignSymbols, normalizeQuery } from "@/lib/alphabet";
 
 type SearchMode = "search" | "search-exactly" | "search-title";
@@ -11,14 +12,16 @@ type SearchMode = "search" | "search-exactly" | "search-title";
 const serif = "var(--font-cormorant), Georgia, serif";
 
 export default function SearchBar() {
+  const t = useTranslations("SearchBar");
+  const locale = useLocale();
   const [text, setText] = useState("");
   const [mode, setMode] = useState<SearchMode>("search");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // The Library knows 36 symbols; show what will actually be looked for when the phrase has others.
-  const normalized = useMemo(() => normalizeQuery(text).trim(), [text]);
-  const foreign = useMemo(() => foreignSymbols(text), [text]);
+  // The Library has its own alphabet; show what will actually be looked for when the phrase has other symbols.
+  const normalized = useMemo(() => normalizeQuery(text, locale).trim(), [text, locale]);
+  const foreign = useMemo(() => foreignSymbols(text, locale), [text, locale]);
   const changed = text.trim() !== "" && normalized !== text.trim();
 
   const handleSearch = async (overrideMode?: SearchMode) => {
@@ -27,7 +30,7 @@ export default function SearchBar() {
     setLoading(true);
     try {
       const endpoint = `/api/${activeMode}`;
-      const body = activeMode === "search-title" ? { title: normalized } : { text: normalized };
+      const body = activeMode === "search-title" ? { title: normalized, lang: locale } : { text: normalized, lang: locale };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -46,9 +49,9 @@ export default function SearchBar() {
   };
 
   const modes: { key: SearchMode; label: string }[] = [
-    { key: "search", label: "Поиск" },
-    { key: "search-exactly", label: "Точный" },
-    { key: "search-title", label: "Заголовок" },
+    { key: "search", label: t("modeSearch") },
+    { key: "search-exactly", label: t("modeExact") },
+    { key: "search-title", label: t("modeTitle") },
   ];
 
   return (
@@ -62,7 +65,7 @@ export default function SearchBar() {
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Введите текст для поиска..."
+            placeholder={t("placeholder")}
             bg="dark.700"
             border="1px solid"
             borderColor="brand.300/15"
@@ -97,25 +100,27 @@ export default function SearchBar() {
             style={{ overflow: "hidden" }}
           >
             <Text color="dark.100" fontSize="sm" fontFamily={serif} fontStyle="italic" textAlign="center" mt={3} lineHeight="1.5">
-              В Библиотеке только строчные русские буквы, пробел, запятая и точка
-              {foreign.length > 0 && (
-                <>
-                  {" "}
-                  — символы{" "}
-                  <Box as="span" fontFamily="var(--font-jetbrains), monospace" fontStyle="normal" color="brand.200">
-                    {foreign.slice(0, 8).join(" ")}
-                  </Box>{" "}
-                  не найти
-                </>
-              )}
+              {t("alphabetHint")}
+              {foreign.length > 0 &&
+                t.rich("foreign", {
+                  symbols: foreign.slice(0, 8).join(" "),
+                  mark: (chunks) => (
+                    <Box as="span" fontFamily="var(--font-jetbrains), monospace" fontStyle="normal" color="brand.200">
+                      {chunks}
+                    </Box>
+                  ),
+                })}
               .{" "}
-              {normalized ? (
-                <>
-                  Будем искать: <Box as="span" color="brand.300" fontStyle="normal">«{normalized}»</Box>
-                </>
-              ) : (
-                "Наберите текст русскими буквами."
-              )}
+              {normalized
+                ? t.rich("willSearch", {
+                    query: normalized,
+                    phrase: (chunks) => (
+                      <Box as="span" color="brand.300" fontStyle="normal">
+                        {chunks}
+                      </Box>
+                    ),
+                  })
+                : t("typeInAlphabet")}
             </Text>
           </motion.div>
         )}

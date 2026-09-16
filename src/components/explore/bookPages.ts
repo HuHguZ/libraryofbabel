@@ -61,8 +61,23 @@ export function drawRule(ctx: CanvasRenderingContext2D, cx: number, y: number, w
   ctx.fill();
 }
 
+/** Words printed on the title page, in the reader's language. */
+export interface TitlePageText {
+  title: string;
+  /** Running line above the title, e.g. "THE LIBRARY OF BABEL". */
+  library: string;
+  /** Shown when the volume's title is blank. */
+  untitled: string;
+  /** "Volume 3". */
+  volume: string;
+  /** "Wall 1 · Shelf 2". */
+  location: string;
+  epigraph: string;
+  epigraphSource: string;
+}
+
 /** The title page of a volume (left page of the first spread). */
-export function makeTitlePage(family: string, parchment: THREE.Texture, info: { title: string; wall: number; shelf: number; volume: number }): THREE.CanvasTexture {
+export function makeTitlePage(family: string, parchment: THREE.Texture, info: TitlePageText): THREE.CanvasTexture {
   const W = INDEX_CANVAS.w;
   const H = INDEX_CANVAS.h;
   const [canvas, ctx] = createCanvas(W, H);
@@ -70,10 +85,10 @@ export function makeTitlePage(family: string, parchment: THREE.Texture, info: { 
   ctx.fillStyle = INK;
   ctx.textBaseline = "middle";
   ctx.font = `500 26px ${family}`;
-  drawSpacedText(ctx, "ВАВИЛОНСКАЯ БИБЛИОТЕКА", W / 2, 150, 9);
+  drawSpacedText(ctx, info.library, W / 2, 150, 9);
   drawRule(ctx, W / 2, 200);
 
-  const title = info.title.trim() || "без названия";
+  const title = info.title.trim() || info.untitled;
   let size = 64;
   ctx.font = `500 ${size}px ${family}`;
   let lines = wrapLines(ctx, title, 820);
@@ -89,18 +104,14 @@ export function makeTitlePage(family: string, parchment: THREE.Texture, info: { 
   drawRule(ctx, W / 2, 700, 380);
   ctx.font = `500 46px ${family}`;
   ctx.textAlign = "center";
-  ctx.fillText(`Том ${info.volume}`, W / 2, 790);
+  ctx.fillText(info.volume, W / 2, 790);
   ctx.font = `400 30px ${family}`;
   ctx.fillStyle = INK_SOFT;
-  drawSpacedText(ctx, `Стена ${info.wall}  ·  Полка ${info.shelf}`, W / 2, 850, 2);
+  drawSpacedText(ctx, info.location, W / 2, 850, 2);
 
   ctx.fillStyle = INK;
   ctx.font = `italic 400 30px ${family}`;
-  const epigraph = wrapLines(
-    ctx,
-    "«Библиотека безгранична и периодична. Если бы вечный странник пустился в путь в каком-либо направлении, он мог бы убедиться по прошествии веков, что те же книги повторяются в том же беспорядке.»",
-    680
-  );
+  const epigraph = wrapLines(ctx, info.epigraph, 680);
   ctx.textAlign = "left";
   epigraph.forEach((line, i) => {
     const w = ctx.measureText(line).width;
@@ -108,7 +119,7 @@ export function makeTitlePage(family: string, parchment: THREE.Texture, info: { 
   });
   ctx.font = `400 24px ${family}`;
   ctx.fillStyle = INK_SOFT;
-  drawSpacedText(ctx, "— Хорхе Луис Борхес", W / 2, 1120 + epigraph.length * 40, 2);
+  drawSpacedText(ctx, info.epigraphSource, W / 2, 1120 + epigraph.length * 40, 2);
   return canvasTexture(canvas);
 }
 
@@ -120,7 +131,8 @@ export const INDEX = (() => {
   return { cols, rows, grid, cellW: (grid.x1 - grid.x0) / cols, cellH: (grid.y1 - grid.y0) / rows };
 })();
 
-export function makeIndexPage(family: string, parchment: THREE.Texture): THREE.CanvasTexture {
+/** The heading of the index ("Index of pages") and the line under it. */
+export function makeIndexPage(family: string, parchment: THREE.Texture, text: { title: string; subtitle: string }): THREE.CanvasTexture {
   const W = INDEX_CANVAS.w;
   const H = INDEX_CANVAS.h;
   const [canvas, ctx] = createCanvas(W, H);
@@ -128,10 +140,10 @@ export function makeIndexPage(family: string, parchment: THREE.Texture): THREE.C
   ctx.fillStyle = INK;
   ctx.textBaseline = "middle";
   ctx.font = `500 44px ${family}`;
-  drawSpacedText(ctx, "Указатель страниц", W / 2, 130, 3);
+  drawSpacedText(ctx, text.title, W / 2, 130, 3);
   ctx.font = `400 24px ${family}`;
   ctx.fillStyle = INK_SOFT;
-  drawSpacedText(ctx, `${LIBRARY.pages} страницы · ${LIBRARY.pageLength} знаков на каждой`, W / 2, 180, 1);
+  drawSpacedText(ctx, text.subtitle, W / 2, 180, 1);
   drawRule(ctx, W / 2, 222);
 
   const { cols, rows, grid, cellW, cellH } = INDEX;
@@ -183,6 +195,8 @@ export interface TextPageInfo {
   content: string;
   page: number;
   title: string;
+  /** Running head when the volume's title is blank. */
+  untitled: string;
   /** Left pages carry the page number in the left corner, right pages in the right one. */
   side: "left" | "right";
   /** Phrase to highlight (already in the Library's alphabet). */
@@ -223,7 +237,7 @@ export function makeTextPage(family: string, parchment: THREE.Texture, info: Tex
   ctx.fillStyle = INK_SOFT;
   ctx.font = `italic 400 22px ${family}`;
   ctx.textAlign = "center";
-  const head = fitTitle(ctx, info.title.trim() || "без названия", 620);
+  const head = fitTitle(ctx, info.title.trim() || info.untitled, 620);
   ctx.fillText(head, W / 2, 104);
   ctx.font = `500 24px ${family}`;
   ctx.textAlign = info.side === "left" ? "left" : "right";

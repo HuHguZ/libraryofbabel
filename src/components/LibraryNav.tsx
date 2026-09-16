@@ -2,8 +2,9 @@
 
 import { Box, Flex, Text } from "@chakra-ui/react";
 import { motion } from "motion/react";
+import { useTranslations } from "next-intl";
 import { counterPop, stagger } from "@/lib/animations";
-import NextLink from "next/link";
+import { Link } from "@/i18n/navigation";
 
 const MotionFlex = motion.create(Flex);
 
@@ -16,25 +17,26 @@ interface LibraryNavProps {
 }
 
 export default function LibraryNav({ wall, shelf, volume, page, addressHex }: LibraryNavProps) {
+  const t = useTranslations("Common");
   const hexParam = addressHex ? `?hex=${encodeURIComponent(addressHex)}` : "";
   const items = [
     {
-      label: "Стена",
+      label: t("wall"),
       value: wall,
       href: `/explore/wall/${wall}${hexParam}`,
     },
     {
-      label: "Полка",
+      label: t("shelf"),
       value: shelf,
       href: `/explore/wall/${wall}/shelf/${shelf}${hexParam}`,
     },
     {
-      label: "Том",
+      label: t("volume"),
       value: volume,
       href: `/explore/wall/${wall}/shelf/${shelf}/volume/${volume}${hexParam}`,
     },
     {
-      label: "Страница",
+      label: t("page"),
       value: page,
       href: null,
     },
@@ -53,7 +55,7 @@ export default function LibraryNav({ wall, shelf, volume, page, addressHex }: Li
         <Flex key={item.label} align="center">
           <motion.div variants={counterPop}>
             {item.href ? (
-              <NextLink href={item.href} style={{ textDecoration: "none" }}>
+              <Link href={item.href} style={{ textDecoration: "none" }}>
                 <motion.div
                   whileHover={{ scale: 1.08, y: -2 }}
                   whileTap={{ scale: 0.95 }}
@@ -96,7 +98,7 @@ export default function LibraryNav({ wall, shelf, volume, page, addressHex }: Li
                     </Text>
                   </Box>
                 </motion.div>
-              </NextLink>
+              </Link>
             ) : (
               <Box textAlign="center" px={{ base: 3, md: 5 }} py={2}>
                 <Text

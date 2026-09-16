@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Box, VStack, Heading, Text, Button, Flex } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
 import PageTransition from "@/components/PageTransition";
+import { useRouter } from "@/i18n/navigation";
 import { fadeInUp, stagger, scaleFade } from "@/lib/animations";
-
-
+import { generateRandomHex } from "@/lib/hex";
+import { LIBRARY } from "@/lib/library";
 
 const MotionVStack = motion.create(VStack);
 const MotionBox = motion.create(Box);
@@ -106,6 +107,8 @@ function NumberSelector({
 }
 
 export default function BrowsePage() {
+  const t = useTranslations("Browse");
+  const common = useTranslations("Common");
   const router = useRouter();
   const [wall, setWall] = useState(1);
   const [shelf, setShelf] = useState(1);
@@ -113,12 +116,7 @@ export default function BrowsePage() {
   const [page, setPage] = useState(1);
 
   const handleOpen = () => {
-    const digs = "0123456789abcdefghijklmnopqrstuvwxyz";
-    let hex = "";
-    for (let i = 0; i < 100; i++) {
-      hex += digs[Math.floor(Math.random() * digs.length)];
-    }
-    const address = `${hex}-${wall}-${shelf}-${volume}-${page}`;
+    const address = `${generateRandomHex(100)}-${wall}-${shelf}-${volume}-${page}`;
     router.push(`/page/${encodeURIComponent(address)}`);
   };
 
@@ -150,7 +148,7 @@ export default function BrowsePage() {
               fontWeight="500"
               letterSpacing="0.04em"
             >
-              Обзор библиотеки
+              {t("title")}
             </Heading>
             <AnimatedOrnament />
             <Text
@@ -161,8 +159,7 @@ export default function BrowsePage() {
               fontStyle="italic"
               lineHeight="1.7"
             >
-              Выберите расположение в библиотеке — стену, полку, том и страницу —
-              и откройте случайную книгу.
+              {t("text")}
             </Text>
           </MotionVStack>
 
@@ -175,10 +172,10 @@ export default function BrowsePage() {
             p={{ base: 6, md: 8 }}
           >
             <Flex gap={{ base: 6, md: 10 }} wrap="wrap" justify="center">
-              <NumberSelector label="Стена" value={wall} onChange={setWall} min={1} max={5} />
-              <NumberSelector label="Полка" value={shelf} onChange={setShelf} min={1} max={7} />
-              <NumberSelector label="Том" value={volume} onChange={setVolume} min={1} max={31} />
-              <NumberSelector label="Страница" value={page} onChange={setPage} min={1} max={421} />
+              <NumberSelector label={common("wall")} value={wall} onChange={setWall} min={1} max={LIBRARY.walls} />
+              <NumberSelector label={common("shelf")} value={shelf} onChange={setShelf} min={1} max={LIBRARY.shelves} />
+              <NumberSelector label={common("volume")} value={volume} onChange={setVolume} min={1} max={LIBRARY.volumes} />
+              <NumberSelector label={common("page")} value={page} onChange={setPage} min={1} max={LIBRARY.pages} />
             </Flex>
           </MotionBox>
 
@@ -210,7 +207,7 @@ export default function BrowsePage() {
                 borderRadius="6px"
                 transition="background 0.3s ease, border-color 0.3s ease"
               >
-                Открыть
+                {t("open")}
               </Button>
             </motion.div>
           </motion.div>

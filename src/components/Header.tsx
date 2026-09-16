@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Box, Flex, Heading, Link as ChakraLink, Button, Spinner, Text } from "@chakra-ui/react";
 import { motion } from "motion/react";
-import NextLink from "next/link";
+import { Link, useRouter } from "@/i18n/navigation";
+import LanguageSwitch from "@/components/LanguageSwitch";
 import { fadeIn } from "@/lib/animations";
 
 const MotionFlex = motion.create(Flex);
 
 export default function Header() {
+  const t = useTranslations("Header");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -53,7 +55,7 @@ export default function Header() {
         animate="visible"
       >
         <ChakraLink asChild _hover={{ textDecoration: "none" }}>
-          <NextLink href="/">
+          <Link href="/">
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -68,7 +70,7 @@ export default function Header() {
                   letterSpacing="0.08em"
                   whiteSpace="nowrap"
                 >
-                  <Box as="span" display={{ base: "none", sm: "inline" }}>Вавилонская </Box>Библиотека
+                  <Box as="span" display={{ base: "none", sm: "inline" }}>{t("titleLead")}</Box>{t("titleMain")}
                 </Heading>
                 <Text
                   color="brand.300/30"
@@ -81,22 +83,22 @@ export default function Header() {
                 </Text>
               </Flex>
             </motion.div>
-          </NextLink>
+          </Link>
         </ChakraLink>
 
-        <Flex gap={1} align="center">
+        <Flex gap={{ base: 0, sm: 1 }} align="center">
           {[
-            { href: "/", label: "Поиск" },
-            { href: "/browse", label: "Обзор" },
+            { href: "/", label: t("search") },
+            { href: "/browse", label: t("browse") },
           ].map((link) => (
             <ChakraLink
               key={link.href}
               asChild
               color="dark.200"
-              fontSize="sm"
+              fontSize={{ base: "xs", sm: "sm" }}
               fontWeight="400"
               letterSpacing="0.05em"
-              px={3}
+              px={{ base: 1.5, sm: 3 }}
               py={1}
               borderRadius="4px"
               transition="all 0.2s ease"
@@ -105,14 +107,14 @@ export default function Header() {
                 bg: "brand.300/5",
               }}
             >
-              <NextLink href={link.href}>
+              <Link href={link.href}>
                 <motion.span
                   whileHover={{ y: -1 }}
                   transition={{ duration: 0.15 }}
                 >
                   {link.label}
                 </motion.span>
-              </NextLink>
+              </Link>
             </ChakraLink>
           ))}
           <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.95 }}>
@@ -120,12 +122,12 @@ export default function Header() {
               onClick={handleRandom}
               bg="transparent"
               color="dark.200"
-              fontSize="sm"
+              fontSize={{ base: "xs", sm: "sm" }}
               fontWeight="400"
               letterSpacing="0.05em"
               variant="plain"
               disabled={loading}
-              px={3}
+              px={{ base: 1.5, sm: 3 }}
               py={1}
               minW="auto"
               h="auto"
@@ -136,9 +138,11 @@ export default function Header() {
                 bg: "brand.300/5",
               }}
             >
-              {loading ? <Spinner size="sm" color="brand.300" /> : "Случайная"}
+              {loading ? <Spinner size="sm" color="brand.300" /> : t("random")}
             </Button>
           </motion.div>
+          <Box w="1px" h="16px" bg="brand.300/15" mx={{ base: 1, sm: 2 }} />
+          <LanguageSwitch />
         </Flex>
       </MotionFlex>
     </Box>

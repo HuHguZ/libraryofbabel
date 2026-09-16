@@ -2,13 +2,15 @@
 
 import { Box, Text } from "@chakra-ui/react";
 import { motion } from "motion/react";
-import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { usePathname } from "@/i18n/navigation";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
 import { fadeIn } from "@/lib/animations";
 
 const MotionBox = motion.create(Box);
 
 export default function Footer() {
+  const t = useTranslations("Footer");
   const pathname = usePathname();
   // The 3D galleries fill the viewport; a footer below them would only add a scrollbar.
   if (pathname?.startsWith("/explore") || pathname?.startsWith("/page/")) return null;
@@ -34,7 +36,7 @@ export default function Footer() {
         fontWeight="400"
         letterSpacing="0.05em"
       >
-        По мотивам рассказа Хорхе Луиса Борхеса «Вавилонская библиотека» (1941)
+        {t("credit")}
       </Text>
     </MotionBox>
   );

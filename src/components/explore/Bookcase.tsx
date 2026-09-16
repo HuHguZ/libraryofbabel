@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
+import { useTranslations } from "next-intl";
 import { LIBRARY } from "@/lib/library";
 import { createRandom } from "@/lib/hex";
 import { TINT_GROUPS, useLibraryMaterials } from "./materials";
@@ -148,6 +149,9 @@ export default function Bookcase({
   const materials = useLibraryMaterials();
   const gl = useThree((s) => s.gl);
   const family = useSerifFont();
+  const book = useTranslations("Book");
+  const common = useTranslations("Common");
+  const wallLabel = book("wallPlaque", { n: wall });
 
   const callbacks = useRef({ onHoverBook, onClickBook, onHoverShelf, onClickShelf });
   useLayoutEffect(() => {
@@ -247,12 +251,12 @@ export default function Bookcase({
   /* ── Plaques ── */
   const plaques = useMemo(() => {
     if (!family) return null;
-    const wallPlaque = makePlaqueTexture(`СТЕНА ${wall}`, family, { width: 640, height: 96, fontSize: 52, letterSpacing: 6 });
+    const wallPlaque = makePlaqueTexture(wallLabel, family, { width: 640, height: 96, fontSize: 52, letterSpacing: 6 });
     const shelfPlaques = Array.from({ length: LIBRARY.shelves }, (_, i) =>
       makePlaqueTexture(`${i + 1}`, family, { width: 160, height: 96, fontSize: 60, letterSpacing: 0 })
     );
     return { wallPlaque, shelfPlaques };
-  }, [family, wall]);
+  }, [family, wallLabel]);
 
   useEffect(() => {
     return () => {
@@ -284,14 +288,14 @@ export default function Bookcase({
       const tint = tintOf.get(`${detail.shelf}-${volume}`) ?? 0;
       const scaleY = 0.97 + rand() * 0.06;
       const [x, y, z] = bookLocalPosition(detail.shelf, volume, scaleY);
-      const gilt = makeTitleGilt(title.trim() || `Том ${volume}`, family);
+      const gilt = makeTitleGilt(title.trim() || common("volumeN", { n: volume }), family);
       const spine = materials.books[tint].spine.clone();
       spine.emissiveMap = gilt;
       spine.emissiveIntensity = 0.65;
       spine.needsUpdate = true;
       return { volume, tint, x, y, z, scaleY, spine, gilt };
     });
-  }, [detail, family, seed, wall, tintOf, materials]);
+  }, [detail, family, seed, wall, tintOf, materials, common]);
 
   useEffect(() => {
     return () => {

@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { Box, Flex, Text, Button } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "motion/react";
+import { useTranslations } from "next-intl";
 
 interface AddressDisplayProps {
   address: string;
 }
 
 export default function AddressDisplay({ address }: AddressDisplayProps) {
+  const t = useTranslations("Address");
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -36,7 +38,7 @@ export default function AddressDisplay({ address }: AddressDisplayProps) {
         letterSpacing="0.15em"
         fontFamily="var(--font-jetbrains), monospace"
       >
-        Адрес в библиотеке
+        {t("label")}
       </Text>
       <Flex align="center" gap={3}>
         <Text
@@ -73,7 +75,7 @@ export default function AddressDisplay({ address }: AddressDisplayProps) {
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
               >
-                {copied ? "Скопировано" : "Копировать"}
+                {copied ? t("copied") : t("copy")}
               </motion.span>
             </AnimatePresence>
           </Button>

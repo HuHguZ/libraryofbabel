@@ -14,7 +14,7 @@ export function loadSerifFont(): Promise<string> {
     if (typeof document === "undefined") return "Georgia, serif";
     const raw = getComputedStyle(document.documentElement).getPropertyValue("--font-cormorant").trim();
     const family = raw ? `${raw}, Georgia, serif` : "Georgia, serif";
-    const sample = "Вавилонская Библиотека Стена Полка Том 0123456789 IVX";
+    const sample = "Вавилонская Библиотека Стена Полка Том The Library of Babel Wall Shelf Volume 0123456789 IVX «»—…";
     try {
       await Promise.all([400, 500, 600].map((w) => document.fonts.load(`${w} 40px ${family}`, sample)));
     } catch {

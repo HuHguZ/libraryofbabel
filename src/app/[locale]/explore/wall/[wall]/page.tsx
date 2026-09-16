@@ -1,9 +1,11 @@
 "use client";
 
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { Box } from "@chakra-ui/react";
+import { useLocalizedPath, useRouter } from "@/i18n/navigation";
 import PageTransition from "@/components/PageTransition";
 import ExploreHud, { ExploreStage, HudSelector } from "@/components/explore/ExploreHud";
 import type { GalleryControlsHandle } from "@/components/explore/GalleryControls";
@@ -21,6 +23,9 @@ const WALLS = Array.from({ length: LIBRARY.walls }, (_, i) => i + 1);
 const noSubscribe = () => () => {};
 
 export default function WallExplorePage() {
+  const t = useTranslations("Gallery");
+  const explore = useTranslations("Explore");
+  const common = useTranslations("Common");
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,7 +43,7 @@ export default function WallExplorePage() {
     return (
       <PageTransition>
         <ExploreStage>
-          <ExploreHud kicker="Шестигранная галерея" title={`Стена ${initialWall}`} back={{ href: "/", label: "на главную" }} />
+          <ExploreHud kicker={t("kicker")} title={common("wallN", { n: initialWall })} back={{ href: "/", label: explore("backHome") }} />
         </ExploreStage>
       </PageTransition>
     );
@@ -48,7 +53,11 @@ export default function WallExplorePage() {
 
 /** Mounted once per visit: the world grows around the first address and never re-seeds while walking. */
 function GalleryExplorer({ startHex, initialWall }: { startHex: string; initialWall: number }) {
+  const t = useTranslations("Gallery");
+  const explore = useTranslations("Explore");
+  const common = useTranslations("Common");
   const router = useRouter();
+  const localizedPath = useLocalizedPath();
   const [worldHex] = useState(startHex);
   const worldSeed = useMemo(() => hashString(worldHex), [worldHex]);
   const controlsRef = useRef<GalleryControlsHandle>(null);
@@ -67,8 +76,8 @@ function GalleryExplorer({ startHex, initialWall }: { startHex: string; initialW
   // Hide the hint a while after the scene is actually visible.
   useEffect(() => {
     if (!ready || !showHint) return;
-    const t = setTimeout(() => setShowHint(false), 16000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setShowHint(false), 16000);
+    return () => clearTimeout(timer);
   }, [ready, showHint]);
 
   // Development aid: lets the console move the visitor (window.__gallery.current.teleport(...)).
@@ -81,56 +90,65 @@ function GalleryExplorer({ startHex, initialWall }: { startHex: string; initialW
   // the render loop, before React has re-rendered with a new place.
   const hexQuery = () => `?hex=${encodeURIComponent(placeRef.current.hex)}`;
 
-  const selectWall = useCallback((w: number) => {
-    controlsRef.current?.lookAt(sideYaw(w - 1), -0.04);
-    setFacingWall(w);
-    lastWallRef.current = w;
-    window.history.replaceState(null, "", `/explore/wall/${w}${hexQuery()}`);
-  }, []);
+  const selectWall = useCallback(
+    (w: number) => {
+      controlsRef.current?.lookAt(sideYaw(w - 1), -0.04);
+      setFacingWall(w);
+      lastWallRef.current = w;
+      window.history.replaceState(null, "", localizedPath(`/explore/wall/${w}${hexQuery()}`));
+    },
+    [localizedPath]
+  );
 
-  const onFacingSide = useCallback((side: number) => {
-    if (side === DOOR_INDEX) {
-      setFacingWall(0);
-      return;
-    }
-    const w = side + 1;
-    setFacingWall(w);
-    lastWallRef.current = w;
-    window.history.replaceState(null, "", `/explore/wall/${w}${hexQuery()}`);
-  }, []);
+  const onFacingSide = useCallback(
+    (side: number) => {
+      if (side === DOOR_INDEX) {
+        setFacingWall(0);
+        return;
+      }
+      const w = side + 1;
+      setFacingWall(w);
+      lastWallRef.current = w;
+      window.history.replaceState(null, "", localizedPath(`/explore/wall/${w}${hexQuery()}`));
+    },
+    [localizedPath]
+  );
 
-  const onPlace = useCallback((next: WorldPlace) => {
-    const prev = placeRef.current;
-    placeRef.current = next;
-    setPlace(next);
-    setBanner(
-      next.level > prev.level
-        ? "Вы поднялись в галерею этажом выше. Лестница ведёт дальше вверх."
-        : next.level < prev.level
-          ? "Вы спустились в галерею этажом ниже. Лестница уходит дальше вниз."
-          : "Вы вошли в соседнюю галерею. Здесь те же полки и другие книги."
-    );
-    window.history.replaceState(null, "", `/explore/wall/${lastWallRef.current}?hex=${next.hex}`);
-  }, []);
+  const onPlace = useCallback(
+    (next: WorldPlace) => {
+      const prev = placeRef.current;
+      placeRef.current = next;
+      setPlace(next);
+      setBanner(next.level > prev.level ? t("bannerUp") : next.level < prev.level ? t("bannerDown") : t("bannerNext"));
+      window.history.replaceState(null, "", localizedPath(`/explore/wall/${lastWallRef.current}?hex=${next.hex}`));
+    },
+    [t, localizedPath]
+  );
 
   useEffect(() => {
     if (!banner) return;
-    const t = setTimeout(() => setBanner(null), 3400);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setBanner(null), 3400);
+    return () => clearTimeout(timer);
   }, [banner]);
 
-  const onHoverBook = useCallback((b: BookRef | null) => {
-    setTooltip(b ? `Стена ${b.wall} · Полка ${b.shelf} · Том ${b.volume}` : null);
-  }, []);
-  const onHoverShelf = useCallback((wall: number, shelf: number | null) => {
-    setTooltip(shelf ? `Стена ${wall} · Полка ${shelf} — открыть полку` : null);
-  }, []);
+  const onHoverBook = useCallback(
+    (b: BookRef | null) => {
+      setTooltip(b ? t("tooltipBook", { wall: b.wall, shelf: b.shelf, volume: b.volume }) : null);
+    },
+    [t]
+  );
+  const onHoverShelf = useCallback(
+    (wall: number, shelf: number | null) => {
+      setTooltip(shelf ? t("tooltipShelf", { wall, shelf }) : null);
+    },
+    [t]
+  );
   const onClickBook = useCallback((b: BookRef) => router.push(`/explore/wall/${b.wall}/shelf/${b.shelf}/volume/${b.volume}${hexQuery()}`), [router]);
   const onClickShelf = useCallback((wall: number, shelf: number) => router.push(`/explore/wall/${wall}/shelf/${shelf}${hexQuery()}`), [router]);
   const onInteract = useCallback(() => setShowHint(false), []);
 
-  const title = facingWall === 0 ? "Вестибюль" : `Стена ${facingWall}`;
-  const kicker = place.level === 0 ? "Шестигранная галерея" : `Шестигранная галерея · этаж ${place.level > 0 ? "+" : ""}${place.level}`;
+  const title = facingWall === 0 ? t("vestibule") : common("wallN", { n: facingWall });
+  const kicker = place.level === 0 ? t("kicker") : t("kickerFloor", { floor: `${place.level > 0 ? "+" : ""}${place.level}` });
 
   return (
     <PageTransition>
@@ -156,24 +174,23 @@ function GalleryExplorer({ startHex, initialWall }: { startHex: string; initialW
           kicker={kicker}
           title={title}
           galleryLabel={shortHex(place.hex)}
-          back={{ href: "/", label: "на главную" }}
+          back={{ href: "/", label: explore("backHome") }}
           showHint={ready && showHint}
           hint={
             <>
               <Box as="span" display={{ base: "none", md: "inline" }}>
-                W A S D — идти, Shift — бежать, пробел — прыгнуть, колесо — приблизить. Нажмите на том или на полку.
-                Винтовая лестница в вестибюле ведёт в галереи выше и ниже, дальняя дверь — в соседнюю.
+                {t("hintDesktop")}
               </Box>
               <Box as="span" display={{ base: "inline", md: "none" }}>
-                Ведите пальцем, чтобы осмотреться; двумя пальцами — идти. Коснитесь тома или полки.
+                {t("hintTouch")}
               </Box>
             </>
           }
           lockHint={
             lockable && ready
               ? locked
-                ? "Мышь ведёт взгляд · клик открывает то, что под прицелом · Esc отпускает курсор"
-                : "Нажмите на сцену — управление мышью, как в игре · Esc отпускает курсор"
+                ? t("lockOn")
+                : t("lockOff")
               : null
           }
           reticle={locked ? (tooltip ? "active" : "idle") : null}
@@ -181,7 +198,7 @@ function GalleryExplorer({ startHex, initialWall }: { startHex: string; initialW
           tooltip={tooltip}
           banner={banner}
         >
-          <HudSelector label="Стена" items={WALLS} active={facingWall} onSelect={selectWall} />
+          <HudSelector label={common("wall")} items={WALLS} active={facingWall} onSelect={selectWall} />
         </ExploreHud>
       </ExploreStage>
     </PageTransition>

@@ -8,7 +8,11 @@ export const LIBRARY = {
   titleLength: 31,
 } as const;
 
-export const DIGS = "0123456789abcdefghijklmnopqrstuvwxyz";
+/**
+ * Digits of an address: every symbol of a page is written as one of them. There are more digits
+ * than symbols in either alphabet, so both Libraries share one address format.
+ */
+export const DIGS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 export function clampInt(value: unknown, min: number, max: number, fallback = min): number {
   const n = Math.trunc(Number(value));
@@ -17,5 +21,5 @@ export function clampInt(value: unknown, min: number, max: number, fallback = mi
 }
 
 export function isValidHex(hex: unknown): hex is string {
-  return typeof hex === "string" && hex.length > 0 && hex.length <= LIBRARY.pageLength && /^[0-9a-z]+$/.test(hex);
+  return typeof hex === "string" && hex.length > 0 && hex.length <= LIBRARY.pageLength && /^[0-9a-zA-Z]+$/.test(hex);
 }

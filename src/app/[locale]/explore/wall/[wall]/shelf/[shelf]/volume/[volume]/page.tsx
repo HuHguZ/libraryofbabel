@@ -1,10 +1,11 @@
 "use client";
 
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useLocale, useTranslations } from "next-intl";
 import { Box, Flex, Text } from "@chakra-ui/react";
-import NextLink from "next/link";
+import { Link, useRouter } from "@/i18n/navigation";
 import PageTransition from "@/components/PageTransition";
 import ExploreHud, { ExploreStage } from "@/components/explore/ExploreHud";
 import { generateRandomHex, hashString, shortHex } from "@/lib/hex";
@@ -35,15 +36,19 @@ function Crumb({ href, children, current }: { href?: string; children: React.Rea
     </Text>
   );
   return href ? (
-    <NextLink href={href} style={{ textDecoration: "none" }}>
+    <Link href={href} style={{ textDecoration: "none" }}>
       {inner}
-    </NextLink>
+    </Link>
   ) : (
     inner
   );
 }
 
 export default function VolumeExplorePage() {
+  const t = useTranslations("Volume");
+  const explore = useTranslations("Explore");
+  const common = useTranslations("Common");
+  const locale = useLocale();
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -71,7 +76,7 @@ export default function VolumeExplorePage() {
     fetch("/api/title", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address: `${hex}-${wall}-${shelf}-${volume}-1` }),
+      body: JSON.stringify({ address: `${hex}-${wall}-${shelf}-${volume}-1`, lang: locale }),
       signal: controller.signal,
     })
       .then((r) => r.json())
@@ -82,16 +87,16 @@ export default function VolumeExplorePage() {
         /* offline or aborted */
       });
     return () => controller.abort();
-  }, [hex, wall, shelf, volume]);
+  }, [hex, wall, shelf, volume, locale]);
 
   // Hide the hint a while after the scene is actually visible.
   useEffect(() => {
     if (!ready || !showHint) return;
-    const t = setTimeout(() => setShowHint(false), 12000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setShowHint(false), 12000);
+    return () => clearTimeout(timer);
   }, [ready, showHint]);
 
-  const onHoverPage = useCallback((page: number | null) => setTooltip(page ? `Страница ${page} — открыть` : null), []);
+  const onHoverPage = useCallback((page: number | null) => setTooltip(page ? t("tooltipPage", { page }) : null), [t]);
   const onClickPage = useCallback(
     (page: number) => {
       if (!hex) return;
@@ -118,29 +123,29 @@ export default function VolumeExplorePage() {
         )}
 
         <ExploreHud
-          kicker="Открытый том"
-          title={title.trim() ? `«${title.trim()}»` : `Том ${volume}`}
+          kicker={t("kicker")}
+          title={title.trim() ? common("quoted", { text: title.trim() }) : common("volumeN", { n: volume })}
           galleryLabel={shortHex(hex)}
-          back={{ href: `/explore/wall/${wall}/shelf/${shelf}${hexQuery}`, label: `полка ${shelf}` }}
+          back={{ href: `/explore/wall/${wall}/shelf/${shelf}${hexQuery}`, label: explore("backShelf", { n: shelf }) }}
           showHint={ready && showHint}
           hint={
             <>
-              В томе {LIBRARY.pages} страница. Наведите на номер в указателе и нажмите, чтобы открыть страницу.
-              <Box as="span" display={{ base: "none", md: "inline" }}> Тяните мышью, чтобы наклонить книгу, колесо приближает.</Box>
+              {t("hint", { pages: LIBRARY.pages })}
+              <Box as="span" display={{ base: "none", md: "inline" }}>{t("hintDesktop")}</Box>
             </>
           }
           tooltip={tooltip}
         >
           <Flex align="center" gap={2} flexWrap="wrap" justify="center">
-            <Crumb href={`/explore/wall/${wall}${hexQuery}`}>Стена {wall}</Crumb>
+            <Crumb href={`/explore/wall/${wall}${hexQuery}`}>{common("wallN", { n: wall })}</Crumb>
             <Text color="dark.300" fontSize="xs">
               →
             </Text>
-            <Crumb href={`/explore/wall/${wall}/shelf/${shelf}${hexQuery}`}>Полка {shelf}</Crumb>
+            <Crumb href={`/explore/wall/${wall}/shelf/${shelf}${hexQuery}`}>{common("shelfN", { n: shelf })}</Crumb>
             <Text color="dark.300" fontSize="xs">
               →
             </Text>
-            <Crumb current>Том {volume}</Crumb>
+            <Crumb current>{common("volumeN", { n: volume })}</Crumb>
             <Box w="1px" h="20px" bg="dark.400/50" mx={1} display={{ base: "none", sm: "block" }} />
             <Box
               as="button"
@@ -160,7 +165,7 @@ export default function VolumeExplorePage() {
               transition="all 0.2s ease"
               _hover={{ color: "brand.200", borderColor: "brand.300/40" }}
             >
-              ✦ случайная страница
+              {t("randomPage")}
             </Box>
           </Flex>
         </ExploreHud>

@@ -8,7 +8,7 @@ import { LIBRARY } from "@/lib/library";
 import { useLibraryMaterials } from "./materials";
 import { loadSerifFont } from "./textTexture";
 import { PAGE, makeBlankPage, makeTextPage, makeTitlePage } from "./bookPages";
-import { Bookmark, ReadingTable } from "./VolumeScene";
+import { Bookmark, ReadingTable, useTitlePageText } from "./VolumeScene";
 import { setCanvasCursor } from "./cursor";
 
 export interface ReaderSceneProps {
@@ -78,6 +78,7 @@ function CameraRig() {
 }
 
 export default function ReaderScene({ title, wall, shelf, volume, spread, contents, query, focusToken, onHoverPage, onTurn, onInteract }: ReaderSceneProps) {
+  const titleText = useTitlePageText(title, wall, shelf, volume);
   const materials = useLibraryMaterials();
   const gl = useThree((s) => s.gl);
   const [family, setFamily] = useState<string | null>(null);
@@ -115,7 +116,7 @@ export default function ReaderScene({ title, wall, shelf, volume, spread, conten
       for (const page of needed) {
         if (page < 0 || page > LIBRARY.pages) continue;
         const content = page === 0 ? "" : contents[page];
-        const key = page === 0 ? `title|${title}` : content ? `${page}|${query}|${title}` : "";
+        const key = page === 0 ? `title|${titleText.library}|${title}` : content ? `${page}|${query}|${title}|${titleText.untitled}` : "";
         if (!key) continue;
         const cached = cache.current.get(page);
         if (cached && cached.key === key) {
@@ -125,9 +126,9 @@ export default function ReaderScene({ title, wall, shelf, volume, spread, conten
         cached?.texture.dispose();
         const tex: PageTex =
           page === 0
-            ? { key, texture: makeTitlePage(family, materials.textures.parchment, { title, wall, shelf, volume }), first: null }
+            ? { key, texture: makeTitlePage(family, materials.textures.parchment, titleText), first: null }
             : (() => {
-                const r = makeTextPage(family, materials.textures.parchment, { content: content!, page, title, side: page % 2 === 0 ? "left" : "right", query });
+                const r = makeTextPage(family, materials.textures.parchment, { content: content!, page, title, untitled: titleText.untitled, side: page % 2 === 0 ? "left" : "right", query });
                 return { key, texture: r.texture, first: r.firstMatch };
               })();
         cache.current.set(page, tex);
@@ -135,7 +136,7 @@ export default function ReaderScene({ title, wall, shelf, volume, spread, conten
       }
     }
     return out;
-  }, [family, shown, spread, contents, query, title, wall, shelf, volume, materials]);
+  }, [family, shown, spread, contents, query, title, titleText, materials]);
 
   useEffect(() => {
     const keep = pages;

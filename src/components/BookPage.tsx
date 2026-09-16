@@ -118,6 +118,8 @@ export default function BookPage({ content, highlight }: BookPageProps) {
                 px: "2px",
                 borderRadius: "2px",
                 boxShadow: "0 0 4px rgba(201, 168, 76, 0.2)",
+                // A found sentence can be longer than a line; Chakra's mark would not wrap otherwise.
+                whiteSpace: "pre-wrap",
               }}
             >
               {content}

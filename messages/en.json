@@ -1,0 +1,206 @@
+{
+  "Metadata": {
+    "title": "The Library of Babel",
+    "description": "A library that holds every possible book — every combination of characters that can ever be written."
+  },
+  "Common": {
+    "wall": "Wall",
+    "shelf": "Shelf",
+    "volume": "Volume",
+    "page": "Page",
+    "wallN": "Wall {n}",
+    "shelfN": "Shelf {n}",
+    "volumeN": "Volume {n}",
+    "pageN": "Page {n}",
+    "wallShelf": "Wall {wall} · Shelf {shelf}",
+    "quoted": "“{text}”"
+  },
+  "Header": {
+    "titleLead": "The Library of ",
+    "titleMain": "Babel",
+    "search": "Search",
+    "browse": "Browse",
+    "random": "Random"
+  },
+  "LanguageSwitch": {
+    "label": "Language",
+    "ru": "Русский",
+    "en": "English"
+  },
+  "Footer": {
+    "credit": "Inspired by Jorge Luis Borges’ short story “The Library of Babel” (1941)"
+  },
+  "Home": {
+    "hero": {
+      "kicker": "Jorge Luis Borges · 1941",
+      "titleLine1": "The Library",
+      "titleLine2": "of Babel",
+      "epigraph": "The Library holds every possible book — every combination of characters that can ever be written.",
+      "galleries": "galleries",
+      "walls": "{count, plural, one {wall} other {walls}}",
+      "shelves": "{count, plural, one {shelf} other {shelves}}",
+      "volumes": "{count, plural, one {volume} other {volumes}}",
+      "pages": "{count, plural, one {page} other {pages}}"
+    },
+    "search": {
+      "kicker": "Find it in infinity",
+      "title": "Search the Library",
+      "text": "Type any text, and the Library will point to the exact page it is written on, somewhere among its endless volumes."
+    },
+    "quotes": {
+      "source": "Jorge Luis Borges",
+      "universe": "The universe — some call it the Library — is made up of a vast, perhaps endless number of hexagonal galleries.",
+      "shelves": "Every wall of every hexagon carries five shelves; every shelf, thirty-two volumes, all of the same size.",
+      "eternity": "The Library has existed ab aeterno. No sound mind can doubt this truth, and from it follows at once that the world will last forever.",
+      "everything": "Everything is there: a history of the future down to the last detail, the autobiographies of archangels, the true catalogue of the Library, and thousands upon thousands of false ones..."
+    },
+    "structure": {
+      "kicker": "Architecture",
+      "title": "How the Library is built",
+      "galleryTitle": "A hexagonal gallery",
+      "galleryText": "Every gallery has six walls. Five of them are lined with shelves; the sixth opens onto a vestibule with a mirror, a spiral staircase and the next gallery.",
+      "wallsTitle": "{walls} walls of {shelves} shelves",
+      "wallsText": "Every wall has seven shelves, and every shelf holds thirty-one volumes of the same size.",
+      "pagesTitle": "{pages, plural, one {# page} other {# pages}}",
+      "pagesText": "Every volume has four hundred and twenty-one pages, each of them four thousand eight hundred and nineteen characters long.",
+      "booksTitle": "Every possible book",
+      "booksText": "The Library holds every possible combination of {symbols, plural, one {# symbol} other {# symbols}}: letters, digits, the space and punctuation marks. Every conceivable book has already been written."
+    },
+    "numbers": {
+      "kicker": "Scale",
+      "title": "The numbers of infinity",
+      "alphabet": "{count, plural, one {symbol in the alphabet} other {symbols in the alphabet}}",
+      "alphabetNote": "{letters, plural, one {# letter} other {# letters}}, {digits, plural, one {# digit} other {# digits}}, the space and {marks, plural, one {# punctuation mark} other {# punctuation marks}}",
+      "pageLength": "{count, plural, one {character per page} other {characters per page}}",
+      "pageLengthNote": "every page is a unique point in the space of all texts",
+      "pages": "{count, plural, one {page per volume} other {pages per volume}}",
+      "pagesNote": "and every volume has a title of its own",
+      "volumes": "{count, plural, one {volume per gallery} other {volumes per gallery}}",
+      "volumesNote": "{walls} walls × {shelves} shelves × {volumes} volumes",
+      "total": "The number of distinct pages in the Library:",
+      "approx": "≈ {mantissa} × 10<sup>{exponent}</sup> — in Borges’ story, with 25 symbols and 410 pages, there were 25<sup>1,312,000</sup> books"
+    },
+    "explore": {
+      "kicker": "Navigation",
+      "title": "Explore the Library",
+      "searchTitle": "Text search",
+      "searchText": "Find any text ever written, or not yet written. Every thought is already recorded on one of the pages.",
+      "browseTitle": "Browse the shelves",
+      "browseText": "Pick a wall, a shelf, a volume and a page. Move through the Library like one of Borges’ librarians.",
+      "galleryTitle": "3D gallery",
+      "galleryText": "Step into a hexagonal gallery and look over its shelves in three dimensions. Feel the scale of infinity.",
+      "random": "✦  Random page  ✦",
+      "opening": "Opening..."
+    },
+    "how": {
+      "kicker": "Algorithm",
+      "title": "How it works",
+      "addressTitle": "Addressing",
+      "addressText": "Every page has a unique address: a long string of digits and Latin letters, followed by its wall, shelf, volume and page.",
+      "determinismTitle": "Determinism",
+      "determinismText": "A page’s content is fully defined by its address. The same address always leads to the same text.",
+      "reversibilityTitle": "Reversibility",
+      "reversibilityText": "Any text can be found: the algorithm computes the exact address where the text you typed is written.",
+      "completenessTitle": "Completeness",
+      "completenessText": "Every possible combination of symbols exists. You do not create a text; you find it in the endless Library."
+    },
+    "finalQuote": {
+      "text": "“The Library is limitless and periodic. An eternal wanderer setting out in any direction would find, after centuries, that the same books recur in the same disorder — a disorder which, recurring, becomes an order: the Order.”",
+      "source": "— Jorge Luis Borges, 1941"
+    }
+  },
+  "SearchBar": {
+    "placeholder": "Type the text to search for...",
+    "modeSearch": "Search",
+    "modeExact": "Exact",
+    "modeTitle": "Title",
+    "alphabetHint": "The Library holds only lowercase English letters, digits, the space and punctuation marks",
+    "foreign": " — <mark>{symbols}</mark> cannot be found",
+    "willSearch": "Searching for: <phrase>“{query}”</phrase>",
+    "typeInAlphabet": "Type your text in English letters."
+  },
+  "Browse": {
+    "title": "Browse the Library",
+    "text": "Pick a place in the Library — a wall, a shelf, a volume and a page — and open a random book.",
+    "open": "Open"
+  },
+  "Explore": {
+    "gallery": "gallery",
+    "backHome": "home",
+    "backWall": "wall {n}",
+    "backShelf": "shelf {n}",
+    "backVolume": "volume {n}",
+    "lampsWarming": "The lamps are warming up…"
+  },
+  "Gallery": {
+    "kicker": "Hexagonal gallery",
+    "kickerFloor": "Hexagonal gallery · floor {floor}",
+    "vestibule": "Vestibule",
+    "bannerUp": "You have climbed to the gallery one floor up. The staircase goes on upwards.",
+    "bannerDown": "You have gone down to the gallery one floor below. The staircase goes on downwards.",
+    "bannerNext": "You have entered the next gallery. The same shelves, different books.",
+    "tooltipBook": "Wall {wall} · Shelf {shelf} · Volume {volume}",
+    "tooltipShelf": "Wall {wall} · Shelf {shelf} — open the shelf",
+    "hintDesktop": "W A S D — walk, Shift — run, space — jump, wheel — zoom. Click a volume or a shelf. The spiral staircase in the vestibule leads to the galleries above and below; the far door leads to the next one.",
+    "hintTouch": "Drag a finger to look around; use two fingers to walk. Tap a volume or a shelf.",
+    "lockOn": "The mouse steers your gaze · a click opens what is under the crosshair · Esc releases the cursor",
+    "lockOff": "Click the scene to steer with the mouse, like in a game · Esc releases the cursor"
+  },
+  "Shelf": {
+    "kicker": "Bookshelf",
+    "tooltipVolume": "Volume {volume}",
+    "tooltipTitled": "Volume {volume} — “{title}”",
+    "tooltipHere": "Shelf {shelf} — you are here",
+    "tooltipGo": "Wall {wall} · Shelf {shelf} — go to this shelf",
+    "hint": "The lit shelf is the open one: it holds {volumes, plural, one {# volume} other {# volumes}}. Hover over a spine to read its title, click to open the volume.",
+    "hintDesktop": " The mouse wheel zooms; clicking another shelf takes you there."
+  },
+  "Volume": {
+    "kicker": "Open volume",
+    "tooltipPage": "Page {page} — open",
+    "hint": "The volume has {pages, plural, one {# page} other {# pages}}. Point at a number in the index and click to open that page.",
+    "hintDesktop": " Drag with the mouse to tilt the book; the wheel zooms.",
+    "randomPage": "✦ random page"
+  },
+  "Reader": {
+    "notFoundTitle": "There is no such address in the Library",
+    "notFoundText": "A page address looks like this: the gallery’s characters, then the wall, shelf, volume and page, separated by hyphens.",
+    "tooltipNext": "Next page ›",
+    "tooltipPrev": "‹ Previous page",
+    "titlePage": "Title page · page 1",
+    "spreadPages": "Pages {from}–{to}",
+    "kicker": "Open book · wall {wall} · shelf {shelf}",
+    "hint": "Click the right page or press → to turn it; click the left page or press ← to go back.",
+    "hintDesktop": " The wheel zooms, the mouse tilts the book. Matches are highlighted on the page.",
+    "spreadText": "Text of the spread",
+    "close": "close ✕",
+    "prevTitle": "Previous spread (←)",
+    "prev": "‹ back",
+    "nextTitle": "Next spread (→)",
+    "next": "forward ›",
+    "findPlaceholder": "find on the page…",
+    "found": "found: {count}",
+    "notOnSpread": "not on this spread",
+    "textAndAddress": "text & address"
+  },
+  "Address": {
+    "label": "Address in the Library",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "Book": {
+    "library": "THE LIBRARY OF BABEL",
+    "untitled": "untitled",
+    "location": "Wall {wall}  ·  Shelf {shelf}",
+    "epigraph": "“The Library is limitless and periodic. An eternal wanderer setting out in any direction would find, after centuries, that the same books recur in the same disorder.”",
+    "epigraphSource": "— Jorge Luis Borges",
+    "indexTitle": "Index of pages",
+    "indexSubtitle": "{pages, plural, one {# page} other {# pages}} · {chars, plural, one {# character} other {# characters}} on each",
+    "wallPlaque": "WALL {n}"
+  },
+  "NotFound": {
+    "title": "This page is not even in the Library",
+    "text": "Though everything else is.",
+    "home": "Back to the home page"
+  }
+}

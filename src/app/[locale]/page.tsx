@@ -11,12 +11,14 @@ import {
   useSpring,
   AnimatePresence,
 } from "motion/react";
-import { useRouter } from "next/navigation";
-import NextLink from "next/link";
 import Image from "next/image";
+import { useLocale, useTranslations } from "next-intl";
 import SearchBar from "@/components/SearchBar";
 import AnimatedOrnament from "@/components/AnimatedOrnament";
 import PageTransition from "@/components/PageTransition";
+import { Link, useRouter } from "@/i18n/navigation";
+import { ALPHABET_PARTS, ALPHABETS } from "@/lib/alphabet";
+import { LIBRARY } from "@/lib/library";
 import {
   fadeInUp,
   stagger,
@@ -41,6 +43,7 @@ function useSectionProgress() {
 
 /* ─── Animated counter ─── */
 function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
+  const locale = useLocale();
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true });
   const motionVal = useMotionValue(0);
@@ -53,11 +56,11 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
   useEffect(() => {
     const unsub = spring.on("change", (v) => {
       if (ref.current) {
-        ref.current.textContent = Math.floor(v).toLocaleString("ru-RU") + suffix;
+        ref.current.textContent = Math.floor(v).toLocaleString(locale) + suffix;
       }
     });
     return unsub;
-  }, [spring, suffix]);
+  }, [spring, suffix, locale]);
 
   return <span ref={ref}>0{suffix}</span>;
 }
@@ -110,25 +113,8 @@ function hexPoints(cx: number, cy: number, r: number) {
   }).join(" ");
 }
 
-/* ─── Rotating quotes ─── */
-const quotes = [
-  {
-    text: "Вселенная — некоторые называют её Библиотекой — состоит из огромного, возможно бесконечного числа шестигранных галерей.",
-    source: "Хорхе Луис Борхес",
-  },
-  {
-    text: "На каждой стене каждого шестигранника расположено пять полок; на каждой полке — тридцать два тома единообразного формата.",
-    source: "Хорхе Луис Борхес",
-  },
-  {
-    text: "Библиотека существует ab aeterno. В этой истине, непосредственное следствие которой — грядущая вечность мира, не может усомниться ни один здравый ум.",
-    source: "Хорхе Луис Борхес",
-  },
-  {
-    text: "Всё: подробнейшая история будущего, автобиографии архангелов, верный каталог Библиотеки, тысячи и тысячи фальшивых каталогов...",
-    source: "Хорхе Луис Борхес",
-  },
-];
+/* ─── Rotating quotes (texts live in the messages under Home.quotes) ─── */
+const quotes = ["universe", "shelves", "eternity", "everything"] as const;
 
 /* ─── Navigation card ─── */
 function NavCard({
@@ -153,7 +139,7 @@ function NavCard({
       whileHover={{ y: -6, transition: { duration: 0.3 } }}
       style={{ flex: "1 1 280px", maxWidth: 360 }}
     >
-      <NextLink href={href} style={{ textDecoration: "none" }}>
+      <Link href={href} style={{ textDecoration: "none" }}>
         <Box
           bg="rgba(17, 17, 25, 0.6)"
           border="1px solid"
@@ -204,7 +190,7 @@ function NavCard({
             </Text>
           </VStack>
         </Box>
-      </NextLink>
+      </Link>
     </motion.div>
   );
 }
@@ -331,6 +317,7 @@ function ScrollIndicator() {
 }
 
 function SearchSection() {
+  const t = useTranslations("Home.search");
   const { ref, progress } = useSectionProgress();
           const titleY = useTransform(progress, [0, 1], [40, -40]);
           const searchY = useTransform(progress, [0, 1], [60, -20]);
@@ -357,7 +344,7 @@ function SearchSection() {
                     fontFamily="var(--font-jetbrains), monospace"
                     mb={3}
                   >
-                    Найти в бесконечности
+                    {t("kicker")}
                   </Text>
                   <Heading
                     as="h2"
@@ -367,7 +354,7 @@ function SearchSection() {
                     fontWeight="400"
                     letterSpacing="0.04em"
                   >
-                    Поиск по Библиотеке
+                    {t("title")}
                   </Heading>
                 </motion.div>
 
@@ -381,8 +368,7 @@ function SearchSection() {
                     fontStyle="italic"
                     variants={scrollFadeInUp}
                   >
-                    Введите любой текст — и Библиотека укажет точную страницу, на которой
-                    он записан, среди бесконечных томов.
+                    {t("text")}
                   </MotionText>
                 </motion.div>
 
@@ -396,6 +382,8 @@ function SearchSection() {
 }
 
 function QuotesSection({ quoteIndex, setQuoteIndex }: { quoteIndex: number; setQuoteIndex: (i: number) => void }) {
+  const t = useTranslations("Home.quotes");
+  const common = useTranslations("Common");
   const { ref, progress } = useSectionProgress();
           const quoteY = useTransform(progress, [0, 1], [30, -30]);
           const quotemarkY = useTransform(progress, [0, 1], [50, -50]);
@@ -443,7 +431,7 @@ function QuotesSection({ quoteIndex, setQuoteIndex }: { quoteIndex: number; setQ
                   fontWeight="300"
                   letterSpacing="0.02em"
                 >
-                  &laquo;{quotes[quoteIndex].text}&raquo;
+                  {common("quoted", { text: t(quotes[quoteIndex]) })}
                 </Text>
                 <Text
                   color="dark.300"
@@ -453,7 +441,7 @@ function QuotesSection({ quoteIndex, setQuoteIndex }: { quoteIndex: number; setQ
                   fontWeight="300"
                   letterSpacing="0.1em"
                 >
-                  — {quotes[quoteIndex].source}
+                  — {t("source")}
                 </Text>
               </motion.div>
             </AnimatePresence>
@@ -495,6 +483,8 @@ function QuotesSection({ quoteIndex, setQuoteIndex }: { quoteIndex: number; setQ
 }
 
 function StructureSection() {
+  const t = useTranslations("Home.structure");
+  const locale = useLocale();
   const { ref, progress } = useSectionProgress();
           const hexY = useTransform(progress, [0, 1], [60, -60]);
           const hexRotate = useTransform(progress, [0, 1], [-5, 5]);
@@ -523,7 +513,7 @@ function StructureSection() {
               fontFamily="var(--font-jetbrains), monospace"
               mb={3}
             >
-              Архитектура
+              {t("kicker")}
             </Text>
             <Heading
               as="h2"
@@ -533,7 +523,7 @@ function StructureSection() {
               fontWeight="400"
               letterSpacing="0.04em"
             >
-              Устройство Библиотеки
+              {t("title")}
             </Heading>
           </motion.div>
 
@@ -556,23 +546,23 @@ function StructureSection() {
             {[
               {
                 icon: "⬡",
-                title: "Шестигранная галерея",
-                text: "Каждая галерея имеет шесть стен. Пять из них заняты полками; шестая ведёт в вестибюль — к зеркалу, винтовой лестнице и соседней галерее.",
+                title: t("galleryTitle"),
+                text: t("galleryText"),
               },
               {
                 icon: "▐",
-                title: "5 стен по 7 полок",
-                text: "На каждой стене — семь полок, на каждой полке — тридцать один том единообразного формата.",
+                title: t("wallsTitle", { walls: LIBRARY.walls, shelves: LIBRARY.shelves }),
+                text: t("wallsText"),
               },
               {
                 icon: "◰",
-                title: "421 страница",
-                text: "Каждый том содержит четыреста двадцать одну страницу, на каждой — четыре тысячи восемьсот девятнадцать знаков.",
+                title: t("pagesTitle", { pages: LIBRARY.pages }),
+                text: t("pagesText"),
               },
               {
                 icon: "∞",
-                title: "Все возможные книги",
-                text: "Библиотека содержит все возможные комбинации 36 символов. Каждая мыслимая книга уже написана.",
+                title: t("booksTitle"),
+                text: t("booksText", { symbols: ALPHABETS[locale].length }),
               },
             ].map((item, i) => (
               <motion.div
@@ -642,6 +632,14 @@ function StructureSection() {
 }
 
 function NumbersSection() {
+  const t = useTranslations("Home.numbers");
+  const locale = useLocale();
+  const symbols = ALPHABETS[locale].length;
+  const parts = ALPHABET_PARTS[locale];
+  // symbols ^ pageLength written as mantissa × 10^exponent.
+  const log = LIBRARY.pageLength * Math.log10(symbols);
+  const exponent = Math.floor(log);
+  const mantissa = (10 ** (log - exponent)).toLocaleString(locale, { maximumFractionDigits: 1 });
   const { ref, progress } = useSectionProgress();
           const titleY5 = useTransform(progress, [0, 1], [25, -25]);
           const numbersY = useTransform(progress, [0, 1], [40, -20]);
@@ -669,7 +667,7 @@ function NumbersSection() {
               fontFamily="var(--font-jetbrains), monospace"
               mb={3}
             >
-              Масштаб
+              {t("kicker")}
             </Text>
             <Heading
               as="h2"
@@ -679,7 +677,7 @@ function NumbersSection() {
               fontWeight="400"
               letterSpacing="0.04em"
             >
-              Числа бесконечности
+              {t("title")}
             </Heading>
           </motion.div>
 
@@ -691,10 +689,20 @@ function NumbersSection() {
             w="100%"
           >
             {[
-              { value: 36, suffix: "", label: "символов алфавита", note: "33 буквы, пробел, запятая и точка" },
-              { value: 4819, suffix: "", label: "знаков на странице", note: "каждая страница — уникальная точка в пространстве всех текстов" },
-              { value: 421, suffix: "", label: "страница в томе", note: "и у каждого тома есть своё заглавие" },
-              { value: 1085, suffix: "", label: "томов в галерее", note: "5 стен × 7 полок × 31 том" },
+              {
+                value: symbols,
+                suffix: "",
+                label: t("alphabet", { count: symbols }),
+                note: t("alphabetNote", { letters: parts.letters.length, digits: parts.digits.length, marks: parts.punctuation.length }),
+              },
+              { value: LIBRARY.pageLength, suffix: "", label: t("pageLength", { count: LIBRARY.pageLength }), note: t("pageLengthNote") },
+              { value: LIBRARY.pages, suffix: "", label: t("pages", { count: LIBRARY.pages }), note: t("pagesNote") },
+              {
+                value: LIBRARY.walls * LIBRARY.shelves * LIBRARY.volumes,
+                suffix: "",
+                label: t("volumes", { count: LIBRARY.walls * LIBRARY.shelves * LIBRARY.volumes }),
+                note: t("volumesNote", { walls: LIBRARY.walls, shelves: LIBRARY.shelves, volumes: LIBRARY.volumes }),
+              },
             ].map((stat, i) => (
               <motion.div
                 key={stat.label}
@@ -755,7 +763,7 @@ function NumbersSection() {
                 fontStyle="italic"
                 mb={3}
               >
-                Число различных страниц в Библиотеке:
+                {t("total")}
               </Text>
               <Text
                 color="brand.300"
@@ -765,7 +773,8 @@ function NumbersSection() {
                 letterSpacing="0.05em"
                 wordBreak="break-all"
               >
-                36<sup>4819</sup>
+                {symbols}
+                <sup>{LIBRARY.pageLength}</sup>
               </Text>
               <Text
                 color="dark.300"
@@ -774,7 +783,7 @@ function NumbersSection() {
                 fontWeight="300"
                 mt={2}
               >
-                ≈ 6.6 × 10<sup>7499</sup> — у Борхеса, с 25 символами и 410 страницами, книг было 25<sup>1 312 000</sup>
+                {t.rich("approx", { mantissa, exponent: String(exponent), sup: (chunks) => <sup>{chunks}</sup> })}
               </Text>
             </Box>
           </motion.div>
@@ -785,6 +794,7 @@ function NumbersSection() {
 }
 
 function ExploreSection({ handleRandom, loading }: { handleRandom: () => void; loading: boolean }) {
+  const t = useTranslations("Home.explore");
   const { ref, progress } = useSectionProgress();
           const titleY6 = useTransform(progress, [0, 1], [30, -30]);
           const cardsY6 = useTransform(progress, [0, 1], [50, -15]);
@@ -809,7 +819,7 @@ function ExploreSection({ handleRandom, loading }: { handleRandom: () => void; l
               fontFamily="var(--font-jetbrains), monospace"
               mb={3}
             >
-              Навигация
+              {t("kicker")}
             </Text>
             <Heading
               as="h2"
@@ -819,29 +829,29 @@ function ExploreSection({ handleRandom, loading }: { handleRandom: () => void; l
               fontWeight="400"
               letterSpacing="0.04em"
             >
-              Исследуйте Библиотеку
+              {t("title")}
             </Heading>
           </motion.div>
 
           <motion.div style={{ y: cardsY6, width: "100%" }}>
           <Flex gap={{ base: 4, md: 6 }} wrap="wrap" justify="center" w="100%">
             <NavCard
-              title="Поиск текста"
-              description="Найдите любой текст, когда-либо написанный или ещё не написанный. Каждая мысль уже записана на одной из страниц."
+              title={t("searchTitle")}
+              description={t("searchText")}
               href="/"
               icon={<SearchIcon />}
               delay={0}
             />
             <NavCard
-              title="Обзор полок"
-              description="Выберите стену, полку, том и страницу. Перемещайтесь по библиотеке как библиотекарь Борхеса."
+              title={t("browseTitle")}
+              description={t("browseText")}
               href="/browse"
               icon={<BookIcon />}
               delay={0.1}
             />
             <NavCard
-              title="3D Галерея"
-              description="Войдите в шестигранную галерею и осмотрите полки в трёхмерном пространстве. Ощутите масштаб бесконечности."
+              title={t("galleryTitle")}
+              description={t("galleryText")}
               href="/explore/wall/1"
               icon={<CubeIcon />}
               delay={0.2}
@@ -881,7 +891,7 @@ function ExploreSection({ handleRandom, loading }: { handleRandom: () => void; l
               }}
               whileTap={{ scale: 0.97 }}
             >
-              {loading ? "Открываем..." : "✦  Случайная страница  ✦"}
+              {loading ? t("opening") : t("random")}
             </motion.button>
           </motion.div>
         </VStack>
@@ -891,6 +901,7 @@ function ExploreSection({ handleRandom, loading }: { handleRandom: () => void; l
 }
 
 function HowItWorksSection() {
+  const t = useTranslations("Home.how");
   const { ref, progress } = useSectionProgress();
           const titleY7 = useTransform(progress, [0, 1], [25, -25]);
           const stepsY = useTransform(progress, [0, 1], [40, -15]);
@@ -917,7 +928,7 @@ function HowItWorksSection() {
               fontFamily="var(--font-jetbrains), monospace"
               mb={3}
             >
-              Алгоритм
+              {t("kicker")}
             </Text>
             <Heading
               as="h2"
@@ -927,7 +938,7 @@ function HowItWorksSection() {
               fontWeight="400"
               letterSpacing="0.04em"
             >
-              Как это работает
+              {t("title")}
             </Heading>
           </motion.div>
 
@@ -936,23 +947,23 @@ function HowItWorksSection() {
             {[
               {
                 step: "I",
-                title: "Адресация",
-                text: "Каждая страница имеет уникальный адрес — длинное шестнадцатеричное число, определяющее галерею, стену, полку, том и страницу.",
+                title: t("addressTitle"),
+                text: t("addressText"),
               },
               {
                 step: "II",
-                title: "Детерминизм",
-                text: "Содержимое страницы полностью определяется её адресом. Один и тот же адрес всегда ведёт к одному и тому же тексту.",
+                title: t("determinismTitle"),
+                text: t("determinismText"),
               },
               {
                 step: "III",
-                title: "Обратимость",
-                text: "Любой текст можно найти — алгоритм вычисляет точный адрес, на котором записан введённый текст.",
+                title: t("reversibilityTitle"),
+                text: t("reversibilityText"),
               },
               {
                 step: "IV",
-                title: "Полнота",
-                text: "Каждая возможная комбинация символов существует. Вы не создаёте текст — вы находите его в бесконечной библиотеке.",
+                title: t("completenessTitle"),
+                text: t("completenessText"),
               },
             ].map((item, i) => (
               <motion.div
@@ -1019,6 +1030,7 @@ function HowItWorksSection() {
 }
 
 function FinalQuoteSection() {
+  const t = useTranslations("Home.finalQuote");
   const { ref, progress } = useSectionProgress();
           const finalY = useTransform(progress, [0, 1], [30, -20]);
           const finalScale = useTransform(progress, [0, 0.5, 1], [0.96, 1, 0.98]);
@@ -1042,11 +1054,7 @@ function FinalQuoteSection() {
               fontStyle="italic"
               fontWeight="300"
             >
-              &laquo;Библиотека безгранична и периодична. Если бы вечный
-              странник пустился в путь в каком-либо направлении, он мог бы
-              убедиться по прошествии веков, что те же книги повторяются в
-              том же беспорядке, который, повторяясь, становится порядком:
-              Порядком.&raquo;
+              {t("text")}
             </Text>
             <Text
               color="dark.300"
@@ -1055,7 +1063,7 @@ function FinalQuoteSection() {
               fontWeight="300"
               letterSpacing="0.1em"
             >
-              — Хорхе Луис Борхес, 1941
+              {t("source")}
             </Text>
           </VStack>
         </motion.div>
@@ -1069,6 +1077,7 @@ function FinalQuoteSection() {
    ═══════════════════════════════════════════════════ */
 
 export default function Home() {
+  const t = useTranslations("Home.hero");
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -1173,7 +1182,7 @@ export default function Home() {
                   fontFamily="var(--font-jetbrains), monospace"
                   variants={fadeInUp}
                 >
-                  Хорхе Луис Борхес &middot; 1941
+                  {t("kicker")}
                 </MotionText>
               </motion.div>
 
@@ -1188,9 +1197,9 @@ export default function Home() {
                   letterSpacing="0.05em"
                   className="shimmer-text"
                 >
-                  Вавилонская
+                  {t("titleLine1")}
                   <br />
-                  Библиотека
+                  {t("titleLine2")}
                 </Heading>
               </motion.div>
 
@@ -1211,8 +1220,7 @@ export default function Home() {
                   fontWeight="300"
                   variants={fadeInUp}
                 >
-                  Библиотека содержит все возможные книги — каждую комбинацию
-                  символов, которую только можно составить.
+                  {t("epigraph")}
                 </MotionText>
               </motion.div>
 
@@ -1226,11 +1234,11 @@ export default function Home() {
                   variants={fadeInUp}
                 >
                   {[
-                    { value: "∞", label: "галерей" },
-                    { value: "5", label: "стен" },
-                    { value: "7", label: "полок" },
-                    { value: "31", label: "том" },
-                    { value: "421", label: "страниц" },
+                    { value: "∞", label: t("galleries") },
+                    { value: String(LIBRARY.walls), label: t("walls", { count: LIBRARY.walls }) },
+                    { value: String(LIBRARY.shelves), label: t("shelves", { count: LIBRARY.shelves }) },
+                    { value: String(LIBRARY.volumes), label: t("volumes", { count: LIBRARY.volumes }) },
+                    { value: String(LIBRARY.pages), label: t("pages", { count: LIBRARY.pages }) },
                   ].map((stat, i) => (
                     <Box
                       key={stat.label}

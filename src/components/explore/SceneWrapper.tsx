@@ -5,6 +5,7 @@ import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { Box, Text } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import * as THREE from "three";
 import { LibraryMaterialsProvider } from "./materials";
 import { isCenterAim } from "./cursor";
@@ -50,6 +51,7 @@ const sceneEvents = (store: Parameters<typeof defaultEvents>[0]) => {
  * and a loading veil is shown until the scene has actually mounted.
  */
 export default function SceneWrapper({ children, seed = 0, post = true, onReady }: SceneWrapperProps) {
+  const t = useTranslations("Explore");
   const [ready, setReady] = useState(false);
 
   return (
@@ -104,7 +106,7 @@ export default function SceneWrapper({ children, seed = 0, post = true, onReady 
           >
             <motion.div animate={{ opacity: [0.35, 0.9, 0.35] }} transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}>
               <Text color="dark.100" fontSize="sm" fontFamily="var(--font-cormorant), Georgia, serif" fontStyle="italic" letterSpacing="0.08em">
-                Лампы разгораются…
+                {t("lampsWarming")}
               </Text>
             </motion.div>
           </motion.div>
