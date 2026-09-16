@@ -87,6 +87,12 @@ Every shelf holds 31 volumes with a title on the spine; every volume has 421 pag
   </tr>
 </table>
 
+For a closer look there is a loupe: the &ldquo;loupe&rdquo; button, the `L` key or a click of the mouse wheel. It follows the cursor and magnifies whatever lies under it &mdash; the letters, the ribbon, the lamp, the table &mdash; and the wheel changes its power from ×1.5 to ×6. `Esc` puts it away.
+
+<p align="center">
+  <img src="docs/screenshots/loupe.webp" alt="A loupe appears over the page, runs along the lines, magnifies the text further, passes over the ribbon and the lamp and is put away" width="100%" />
+</p>
+
 <table>
   <tr>
     <td width="50%">
@@ -184,6 +190,8 @@ The Library is not a safe: a page's address is its text, written reversibly by a
 | | move over the book | drag with the mouse or `W A S D` (`Shift` to hurry) |
 | | fly to a spot on the page | mouse wheel towards the cursor, `↑` `↓` closer and farther |
 | | tilt the book / see the whole book | right mouse button / `Home` |
+| | take the loupe / put it away | the &ldquo;loupe&rdquo; button, `L` or a click of the mouse wheel / `Esc` |
+| | change the loupe's power | mouse wheel while the loupe is in hand |
 | | find on the spread | the &ldquo;find on the page&rdquo; box |
 | | next / previous match | `Enter` / `Shift+Enter` or the `↓` `↑` arrows by the counter |
 | | copy a page / share a fragment | &ldquo;text & address&rdquo;, then &ldquo;copy text&rdquo; / select text and &ldquo;link to fragment&rdquo; |
@@ -220,6 +228,7 @@ npm test                     # tests (Vitest)
 - **Internationalization** with [next-intl](https://next-intl.dev): translations in `messages/ru.json` and `messages/en.json`, routes under a `[locale]` segment, Russian without a prefix. `src/proxy.ts` detects the language on the home page only; every other link is never redirected to another language.
 - **Textures** (`public/textures`) were generated locally in ComfyUI with the Z-Image Turbo model.
 - **The reader** draws pages onto canvas textures ahead of time, a few spreads either way, and uploads them to the GPU at once, so a turning leaf already has text on its back. Every leaf moves on its own (`src/components/explore/leaves.ts`): the next one lifts once the one before is a little ahead, and a long queue is flipped as a bunch. The bend is computed in the vertices of the geometry as a spring, and every turn draws a character of its own (speed, stiffness, which corner leads, the ripple along the edge).
+- **The loupe** (`src/components/explore/loupe`) does not stretch the finished frame; it draws the scene once more: the same camera, its view cropped (`setViewOffset`) to a square N times smaller than the lens, and that picture is laid over the glass. So the letters under the loupe stay sharp for as long as the page texture has the resolution. The glass shader squeezes the picture towards the rim, parts the colours a little by the frame and adds highlights. The loupe fits any 3D scene: `<Loupe active />` inside the `Canvas` and the `useLoupe()` hook on the page. The model is [Magnifying Glass 01](https://polyhaven.com/a/magnifying_glass_01) by Nazar Borodavka, Poly Haven (CC0).
 - **Links to fragments** look like `/page/<address>?text=12:160-240`: the page, then character offsets into its 4,819-character text (the end exclusive), next to the search phrase `q` if there is one. A selection in the panel is turned into these offsets by measuring the text from the start of the page up to each end of the selection, so search highlights splitting the text into pieces do not get in the way (`src/lib/fragment.ts`).
 
 ## Stack
