@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "keywords": [
     "library",
@@ -33,12 +34,16 @@
     "three": "^0.186.0"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.13.4",
     "@types/react": "~19.2.14",
     "@types/react-dom": "~19.2.3",
     "@types/three": "^0.186.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.5",
-    "typescript": "^6.0.3"
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.1"
   }
 }
