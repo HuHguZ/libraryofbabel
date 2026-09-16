@@ -110,7 +110,8 @@
     }
   },
   "SearchBar": {
-    "placeholder": "Type the text to search for...",
+    "placeholder": "Type the text to search for, on as many lines as you like...",
+    "keysHint": "Enter to search · Shift+Enter for a new line",
     "modeSearch": "Search",
     "modeExact": "Exact",
     "modeTitle": "Title",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Box, Input, Flex, Button, Spinner, Text } from "@chakra-ui/react";
+import { Box, Textarea, Flex, Button, Spinner, Text } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
@@ -10,6 +10,9 @@ import { foreignSymbols, normalizeQuery } from "@/lib/alphabet";
 type SearchMode = "search" | "search-exactly" | "search-title";
 
 const serif = "var(--font-cormorant), Georgia, serif";
+const mono = "var(--font-jetbrains), monospace";
+/** How much of a long query the hint under the field repeats. */
+const PREVIEW = 140;
 
 export default function SearchBar() {
   const t = useTranslations("SearchBar");
@@ -17,12 +20,14 @@ export default function SearchBar() {
   const [text, setText] = useState("");
   const [mode, setMode] = useState<SearchMode>("search");
   const [loading, setLoading] = useState(false);
+  const [focused, setFocused] = useState(false);
   const router = useRouter();
 
   // The Library has its own alphabet; show what will actually be looked for when the phrase has other symbols.
   const normalized = useMemo(() => normalizeQuery(text, locale).trim(), [text, locale]);
   const foreign = useMemo(() => foreignSymbols(text, locale), [text, locale]);
   const changed = text.trim() !== "" && normalized !== text.trim();
+  const preview = normalized.length > PREVIEW ? `${normalized.slice(0, PREVIEW)}…` : normalized;
 
   const handleSearch = async (overrideMode?: SearchMode) => {
     if (!normalized) return;
@@ -62,10 +67,20 @@ export default function SearchBar() {
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
         <Box position="relative">
-          <Input
+          {/* Several lines: the Library keeps line breaks, so a poem or a piece of code is found as it is laid out. */}
+          <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder={t("placeholder")}
+            autoresize
+            rows={1}
+            maxH="16lh"
+            overflowY="auto"
+            resize="none"
+            spellCheck={false}
+            enterKeyHint="search"
             bg="dark.700"
             border="1px solid"
             borderColor="brand.300/15"
@@ -76,17 +91,37 @@ export default function SearchBar() {
               borderColor: "brand.300/60",
               boxShadow: "0 0 0 1px rgba(201, 168, 76, 0.15), 0 0 20px rgba(201, 168, 76, 0.05)",
             }}
-            size="lg"
-            fontFamily="var(--font-jetbrains), monospace"
+            fontFamily={mono}
             fontSize="sm"
             fontWeight="300"
             letterSpacing="0.02em"
+            lineHeight="1.6"
             borderRadius="8px"
-            py={6}
-            transition="all 0.3s ease"
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            px={4}
+            py="15px"
+            transition="border-color 0.3s ease, box-shadow 0.3s ease"
+            onKeyDown={(e) => {
+              // Enter searches; Shift+Enter starts a new line (and a composing IME keeps its Enter).
+              if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+              e.preventDefault();
+              handleSearch();
+            }}
           />
         </Box>
+        <Text
+          color="dark.300"
+          fontSize="10px"
+          fontFamily={mono}
+          letterSpacing="0.05em"
+          textAlign="right"
+          mt={1.5}
+          display={{ base: "none", md: "block" }}
+          opacity={focused || text.includes("\n") ? 1 : 0}
+          transition="opacity 0.25s ease"
+          aria-hidden
+        >
+          {t("keysHint")}
+        </Text>
       </motion.div>
 
       <AnimatePresence>
@@ -113,7 +148,7 @@ export default function SearchBar() {
               .{" "}
               {normalized
                 ? t.rich("willSearch", {
-                    query: normalized,
+                    query: preview,
                     phrase: (chunks) => (
                       <Box as="span" color="brand.300" fontStyle="normal">
                         {chunks}
