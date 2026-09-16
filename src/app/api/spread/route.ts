@@ -3,11 +3,11 @@ import { libraryFor } from "@/lib/babel";
 import { readJson } from "@/lib/api";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
 
-const MAX_PAGES = 12;
+const MAX_PAGES = 16;
 
 /**
  * Several pages of one volume in a single round trip — the 3D reader asks for the open spread
- * and its neighbours so page turns never wait for the network.
+ * and three spreads either way, so page turns never wait for the network.
  */
 export async function POST(request: Request) {
   const parsed = await readJson<{ hex?: unknown; wall?: unknown; shelf?: unknown; volume?: unknown; pages?: unknown; lang?: unknown }>(request);

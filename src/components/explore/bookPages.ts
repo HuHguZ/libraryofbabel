@@ -3,6 +3,7 @@
 import * as THREE from "three";
 import { LIBRARY } from "@/lib/library";
 import { findMatches } from "@/lib/alphabet";
+import { DEFAULT_FRAGMENT_COLOR, FRAGMENT_ALPHA, fragmentWash } from "@/lib/fragmentColor";
 import { canvasTexture, createCanvas, drawSpacedText, wrapLines } from "./textTexture";
 
 /** Size of one page on the reading table, metres. */
@@ -15,16 +16,21 @@ export const TEXT_CANVAS = { w: 1200, h: 1700 } as const;
 
 export const TEXT_LAYOUT = {
   cols: 80,
+  rows: 61,
   left: 110,
   right: 1090,
   top: 190,
   lineHeight: 23.4,
   fontSize: 24,
+  /** Longest lines the type may shrink to when line breaks leave too many lines for the page. */
+  maxCols: 200,
 } as const;
 
 export const INK = "#3a2a18";
 export const INK_SOFT = "rgba(58, 42, 24, 0.55)";
 export const HIGHLIGHT = "rgba(201, 150, 40, 0.55)";
+/** The occurrence of the phrase the reader is at, among the others. */
+export const HIGHLIGHT_CURRENT = "rgba(232, 118, 22, 0.8)";
 
 export function drawParchment(ctx: CanvasRenderingContext2D, parchment: THREE.Texture, w: number, h: number) {
   ctx.fillStyle = "#e6d6b4";
@@ -201,6 +207,12 @@ export interface TextPageInfo {
   side: "left" | "right";
   /** Phrase to highlight (already in the Library's alphabet). */
   query?: string;
+  /** Fragment to mark: character offsets into `content`, the end exclusive. */
+  mark?: { start: number; end: number } | null;
+  /** The reader's fragment colour, "#rrggbb". */
+  markColor?: string;
+  /** Start of the occurrence of the phrase the reader is at, if it is on this page. */
+  current?: number | null;
 }
 
 export interface TextPageResult {
@@ -209,13 +221,51 @@ export interface TextPageResult {
   matches: number[];
   /** Position of the first highlight as fractions of the page (0..1 across, 0..1 down), if any. */
   firstMatch: { x: number; y: number } | null;
+  /** Centre of the marked fragment as fractions of the page, if there is one. */
+  markCenter: { x: number; y: number } | null;
+  /** Position of the current occurrence as fractions of the page, if it is on this page. */
+  currentMatch: { x: number; y: number } | null;
 }
 
-/** Lines of a page: 80 letters each. */
-export function pageLines(content: string): string[] {
-  const lines: string[] = [];
-  for (let i = 0; i < content.length; i += TEXT_LAYOUT.cols) lines.push(content.slice(i, i + TEXT_LAYOUT.cols));
-  return lines;
+/** A line of a page: offsets into the text, the end exclusive; `brk` when a line break (not drawn) follows it. */
+export interface PageLine {
+  start: number;
+  end: number;
+  brk: boolean;
+}
+
+/** Lines of a page: broken at every line break and wrapped at `cols` letters. */
+export function pageLines(content: string, cols: number = TEXT_LAYOUT.cols): PageLine[] {
+  const lines: PageLine[] = [];
+  let start = 0;
+  for (;;) {
+    const nl = content.indexOf("\n", start);
+    const stop = nl === -1 ? content.length : nl;
+    let s = start;
+    do {
+      const end = Math.min(stop, s + cols);
+      lines.push({ start: s, end, brk: end === stop && nl !== -1 });
+      s = end;
+    } while (s < stop);
+    if (nl === -1) return lines;
+    start = nl + 1;
+  }
+}
+
+/**
+ * How a page is set: 80 letters to the line and 61 lines, unless line breaks leave more lines than that.
+ * Then the type gets smaller and the lines longer, just enough for every line to fit the same text block.
+ */
+export function layoutPage(content: string) {
+  const { cols, rows, maxCols, fontSize, lineHeight } = TEXT_LAYOUT;
+  const runs = content.split("\n").map((run) => run.length);
+  const count = (c: number) => runs.reduce((n, len) => n + Math.max(1, Math.ceil(len / c)), 0);
+  let c = cols;
+  while (c < maxCols && count(c) > Math.floor((rows * c) / cols)) c++;
+  const scale = cols / c;
+  const lines = pageLines(content, c);
+  // Past the smallest type a page cannot hold all its lines (only a text of nearly nothing but line breaks).
+  return { lines: lines.slice(0, Math.floor(rows / scale)), scale, fontSize: fontSize * scale, lineHeight: lineHeight * scale };
 }
 
 function fitTitle(ctx: CanvasRenderingContext2D, title: string, maxWidth: number): string {
@@ -228,7 +278,7 @@ function fitTitle(ctx: CanvasRenderingContext2D, title: string, maxWidth: number
 export function makeTextPage(family: string, parchment: THREE.Texture, info: TextPageInfo): TextPageResult {
   const W = TEXT_CANVAS.w;
   const H = TEXT_CANVAS.h;
-  const { left, right, top, lineHeight, fontSize, cols } = TEXT_LAYOUT;
+  const { left, right, top } = TEXT_LAYOUT;
   const [canvas, ctx] = createCanvas(W, H);
   drawParchment(ctx, parchment, W, H);
 
@@ -249,7 +299,8 @@ export function makeTextPage(family: string, parchment: THREE.Texture, info: Tex
   ctx.lineTo(right, 132);
   ctx.stroke();
 
-  const lines = pageLines(info.content);
+  const { lines, fontSize, lineHeight } = layoutPage(info.content);
+  const texts = lines.map((line) => info.content.slice(line.start, line.end));
   const query = info.query ?? "";
   const matches = findMatches(info.content, query);
   ctx.font = `500 ${fontSize}px ${family}`;
@@ -257,28 +308,66 @@ export function makeTextPage(family: string, parchment: THREE.Texture, info: Tex
   const avail = right - left;
 
   // Width scale per line: long lines are condensed to the text block, as fillText(maxWidth) does.
-  const scales = lines.map((line) => Math.min(1, avail / Math.max(1, ctx.measureText(line).width)));
+  const scales = texts.map((text) => Math.min(1, avail / Math.max(1, ctx.measureText(text).width)));
   let firstMatch: TextPageResult["firstMatch"] = null;
+  let markCenter: TextPageResult["markCenter"] = null;
+  let currentMatch: TextPageResult["currentMatch"] = null;
+
+  /** Spans covering the characters from `start` to `end` (exclusive), one per line they run over. A line break shows at the end of its line. */
+  const spans = (start: number, end: number) => {
+    const out: { x0: number; x1: number; y: number }[] = [];
+    lines.forEach((line, l) => {
+      if (line.start >= end || line.end + (line.brk ? 1 : 0) <= start) return;
+      const s = Math.max(start, line.start) - line.start;
+      const e = Math.min(end, line.end) - line.start;
+      const x = (n: number) => left + ctx.measureText(texts[l].slice(0, n)).width * scales[l];
+      out.push({ x0: x(s), x1: x(Math.max(s, e)), y: top + l * lineHeight });
+    });
+    return out;
+  };
+
+  /**
+   * Washes the spans in one fill. Each band is exactly a line tall and all of them go into a single path,
+   * so where a highlight runs on to the next line the translucent colour is not laid twice (that showed
+   * as a dark line under the text).
+   */
+  const wash = (color: string, list: { x0: number; x1: number; y: number }[], pad: number, minWidth: number) => {
+    if (list.length === 0) return;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (const { x0, x1, y } of list) ctx.rect(x0 - pad, y - fontSize * 0.72, Math.max(minWidth, x1 - x0 + 2 * pad), lineHeight);
+    ctx.fill();
+  };
+
+  // The marked fragment lies under the search highlights.
+  const markStart = Math.max(0, info.mark?.start ?? 0);
+  const markEnd = Math.min(info.content.length, info.mark?.end ?? 0);
+  const marked = markEnd > markStart ? spans(markStart, markEnd) : [];
+  if (marked.length) {
+    wash(fragmentWash(info.markColor ?? DEFAULT_FRAGMENT_COLOR, FRAGMENT_ALPHA.book), marked, 1, 4);
+    const x0 = Math.min(...marked.map((s) => s.x0));
+    const x1 = Math.max(...marked.map((s) => s.x1));
+    markCenter = { x: (x0 + x1) / 2 / W, y: (marked[0].y + marked[marked.length - 1].y) / 2 / H };
+  }
 
   if (matches.length) {
-    ctx.fillStyle = HIGHLIGHT;
+    const others: { x0: number; x1: number; y: number }[] = [];
+    const current: { x0: number; x1: number; y: number }[] = [];
     for (const start of matches) {
-      const end = start + query.length;
-      for (let l = Math.floor(start / cols); l * cols < end && l < lines.length; l++) {
-        const line = lines[l];
-        const s = Math.max(start, l * cols) - l * cols;
-        const e = Math.min(end, (l + 1) * cols) - l * cols;
-        const x0 = left + ctx.measureText(line.slice(0, s)).width * scales[l];
-        const x1 = left + ctx.measureText(line.slice(0, e)).width * scales[l];
-        const y = top + l * lineHeight;
-        ctx.fillRect(x0 - 2, y - fontSize * 0.72, Math.max(6, x1 - x0 + 4), fontSize * 1.02);
-        if (!firstMatch) firstMatch = { x: (x0 + x1) / 2 / W, y: y / H };
+      const isCurrent = start === info.current;
+      for (const span of spans(start, start + query.length)) {
+        (isCurrent ? current : others).push(span);
+        const spot = { x: (span.x0 + span.x1) / 2 / W, y: span.y / H };
+        if (!firstMatch) firstMatch = spot;
+        if (isCurrent && !currentMatch) currentMatch = spot;
       }
     }
+    wash(HIGHLIGHT, others, 2, 6);
+    wash(HIGHLIGHT_CURRENT, current, 2, 6);
   }
 
   ctx.fillStyle = INK;
-  lines.forEach((line, l) => ctx.fillText(line, left, top + l * lineHeight, avail));
+  texts.forEach((text, l) => ctx.fillText(text, left, top + l * lineHeight, avail));
 
   // Folio.
   ctx.fillStyle = INK_SOFT;
@@ -286,7 +375,7 @@ export function makeTextPage(family: string, parchment: THREE.Texture, info: Tex
   ctx.textAlign = "center";
   ctx.fillText(`— ${info.page} —`, W / 2, H - 58);
 
-  return { texture: canvasTexture(canvas), matches, firstMatch };
+  return { texture: canvasTexture(canvas), matches, firstMatch, markCenter, currentMatch };
 }
 
 /** A blank page of the same paper (while its text is still on its way). */
