@@ -182,7 +182,12 @@
     "findPlaceholder": "find on the page…",
     "found": "found: {count}",
     "notOnSpread": "not on this spread",
-    "textAndAddress": "text & address"
+    "textAndAddress": "text & address",
+    "fragmentColor": "Highlight colour",
+    "fragmentColorTitle": "Highlight colour: click to pick another",
+    "fragmentColorReset": "reset",
+    "fragmentColorSample": "on the page,",
+    "fragmentColorSampleMarked": "a marked fragment"
   },
   "Address": {
     "label": "Address in the Library",

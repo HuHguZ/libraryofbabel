@@ -182,7 +182,12 @@
     "findPlaceholder": "найти на странице…",
     "found": "найдено: {count}",
     "notOnSpread": "на развороте нет",
-    "textAndAddress": "текст и адрес"
+    "textAndAddress": "текст и адрес",
+    "fragmentColor": "Цвет выделения",
+    "fragmentColorTitle": "Цвет выделения — нажмите, чтобы выбрать другой",
+    "fragmentColorReset": "как было",
+    "fragmentColorSample": "в тексте страницы",
+    "fragmentColorSampleMarked": "выделенный фрагмент"
   },
   "Address": {
     "label": "Адрес в библиотеке",
