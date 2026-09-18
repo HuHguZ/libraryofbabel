@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LIBRARY } from "@/lib/library";
-import { TEXT_LAYOUT, layoutPage, pageLines } from "./bookPages";
+import { TEXT_LAYOUT, layoutPage, pageLines, pagesAround, pagesToDraw } from "./bookPages";
 
 const text = (lines: { start: number; end: number }[], content: string) => lines.map((l) => content.slice(l.start, l.end));
 
@@ -48,5 +48,37 @@ describe("layoutPage", () => {
   it("never lets a page of line breaks run off the paper", () => {
     const page = layoutPage("\n".repeat(LIBRARY.pageLength));
     expect(page.lines.length * page.lineHeight).toBeLessThanOrEqual(TEXT_LAYOUT.rows * TEXT_LAYOUT.lineHeight + 1e-6);
+  });
+});
+
+describe("pagesAround", () => {
+  it("lists the spread's own pages, then the next spread, the one before and the one after next", () => {
+    expect(pagesAround(10, 1)).toEqual([20, 21, 22, 23, 18, 19, 24, 25]);
+  });
+
+  it("looks the other way for a reader turning back", () => {
+    expect(pagesAround(10, -1)).toEqual([20, 21, 18, 19, 22, 23, 16, 17]);
+  });
+});
+
+describe("pagesToDraw", () => {
+  it("draws nothing but the spread ahead while a leaf is still in the air", () => {
+    expect(pagesToDraw(150, 1, [2, 3, 297, 298], false)).toEqual([300, 301]);
+  });
+
+  it("draws the spread, then what is on show, then the spreads either way once the book lies still", () => {
+    // leaves from the front of the book are on show, a long way from the spread the reader has landed at
+    const queue = pagesToDraw(150, 1, [4, 5], true);
+    expect(queue.slice(0, 2)).toEqual([300, 301]);
+    expect(queue).toContain(4);
+    expect(queue).toContain(5);
+    expect(queue.indexOf(4)).toBeLessThan(queue.indexOf(302));
+    expect(queue.indexOf(5)).toBeLessThan(queue.indexOf(302));
+    // and the spreads either way are all there, ready for the next turn
+    expect(queue).toEqual(expect.arrayContaining([302, 303, 298, 299, 304, 305]));
+  });
+
+  it("wants the spread it is heading for first, even with pages on show", () => {
+    expect(pagesToDraw(7, 1, [10, 11], true).slice(0, 2)).toEqual([14, 15]);
   });
 });

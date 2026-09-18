@@ -196,6 +196,28 @@ export function indexCellCenter(index: number): { x: number; y: number } {
   return { x: (grid.x0 + col * cellW + cellW / 2) / INDEX_CANVAS.w, y: (grid.y0 + row * cellH + cellH / 2) / INDEX_CANVAS.h };
 }
 
+/* ── Which page to draw next ── */
+
+/** The pages of spread `spread`, then of the spreads either way of it, the way the reader is going first. */
+export function pagesAround(spread: number, heading: 1 | -1): number[] {
+  const spreads = [0, heading, -heading, 2 * heading];
+  return spreads.flatMap((d) => [2 * (spread + d), 2 * (spread + d) + 1]);
+}
+
+/**
+ * The pages a book wants drawn, the most wanted first — one of them is drawn per frame.
+ *
+ * Drawing a page of text costs the browser far more than a frame, so while anything moves (a book in flight, a
+ * leaf in the air) only the spread the book is heading for is drawn: a page flying past is on screen for two or
+ * three frames, and waiting for it is what makes a turn stutter. Once the book lies open and still, whatever is
+ * on show without a picture is drawn, and then the spreads either way, ready for the next turn.
+ */
+export function pagesToDraw(spread: number, heading: 1 | -1, onShow: number[], still: boolean): number[] {
+  const around = pagesAround(spread, heading);
+  const ahead = around.slice(0, 2);
+  return still ? [...ahead, ...onShow, ...around] : ahead;
+}
+
 /* ── A page of text ── */
 export interface TextPageInfo {
   content: string;
@@ -225,7 +247,24 @@ export interface TextPageResult {
   markCenter: { x: number; y: number } | null;
   /** Position of the current occurrence as fractions of the page, if it is on this page. */
   currentMatch: { x: number; y: number } | null;
+  /**
+   * Writes the next `lines` lines of the page; true while lines are left. The browser draws a page of this many
+   * letters in one piece of work of its own, far longer than a frame: written a few lines at a time, that work
+   * is broken up as well and nothing else waits on it (see `TEXT_BATCH`).
+   */
+  writeLines: (lines: number) => boolean;
 }
+
+/** Lines written in one go while a leaf is in the air: few enough that the browser's drawing of them fits a frame. */
+export const TEXT_BATCH = 8;
+/**
+ * Lines written in one go while the book lies still: the page is wanted whole and at once — a spread of a phrase
+ * just searched for, or the page 1 a book leaving its index turns to. Twice the batch of a page written mid-turn
+ * halves the wait for it; measured over a phrase change (dev, 240 Hz, longest frame / blocked time): 8 lines
+ * cost 25–29 ms / 8–13 ms, 16 cost 20.8–25 ms / 4–9 ms, 24 cost 25–33 ms / 25–34 ms — beyond 16 the dropped
+ * frames cost more than the shorter wait is worth.
+ */
+export const TEXT_BATCH_STILL = 16;
 
 /** A line of a page: offsets into the text, the end exclusive; `brk` when a line break (not drawn) follows it. */
 export interface PageLine {
@@ -366,16 +405,23 @@ export function makeTextPage(family: string, parchment: THREE.Texture, info: Tex
     wash(HIGHLIGHT_CURRENT, current, 2, 6);
   }
 
-  ctx.fillStyle = INK;
-  texts.forEach((text, l) => ctx.fillText(text, left, top + l * lineHeight, avail));
-
-  // Folio.
+  // Folio. It goes on before the text, so that the text is all that is left to write.
   ctx.fillStyle = INK_SOFT;
   ctx.font = `400 22px ${family}`;
   ctx.textAlign = "center";
   ctx.fillText(`— ${info.page} —`, W / 2, H - 58);
 
-  return { texture: canvasTexture(canvas), matches, firstMatch, markCenter, currentMatch };
+  let written = 0;
+  const writeLines = (lines: number) => {
+    ctx.fillStyle = INK;
+    ctx.font = `500 ${fontSize}px ${family}`;
+    ctx.textAlign = "left";
+    const last = Math.min(texts.length, written + Math.max(1, lines));
+    for (; written < last; written++) ctx.fillText(texts[written], left, top + written * lineHeight, avail);
+    return written < texts.length;
+  };
+
+  return { texture: canvasTexture(canvas), matches, firstMatch, markCenter, currentMatch, writeLines };
 }
 
 /** A blank page of the same paper (while its text is still on its way). */

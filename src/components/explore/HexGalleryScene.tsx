@@ -14,7 +14,6 @@ import {
   ROOM,
   STAIR,
   cellAt,
-  closeupForSide,
   constrainWalk,
   facingCenterRotation,
   facingSide,
@@ -22,13 +21,14 @@ import {
   galleryRotation,
   hexagonShape,
   sideAngle,
-  sideYaw,
   stairRampHeight,
   trackLevel,
-  viewpointForSide,
   type GallerySide,
 } from "./geometry";
 import { ALL_TEXTURE_URLS, LAMP_COLOR, LibraryMaterialsProvider, useLibraryMaterials } from "./materials";
+import ReadingDesk from "./stage/ReadingDesk";
+import { BOOKCASE_RADIUS, deskLampLocal, galleryToWorld } from "./stage/deskFrame";
+import type { WalkPose } from "./stage/poses";
 
 export interface WorldPlace {
   level: number;
@@ -37,18 +37,47 @@ export interface WorldPlace {
   hex: string;
 }
 
-export interface HexGallerySceneProps {
-  /** "walk": free first-person exploration of the endless world. "shelf": fixed close-up of one shelf. */
-  mode?: "walk" | "shelf";
-  /** Walk mode: address of the starting gallery; every other gallery of the world derives from it. */
-  worldHex?: string;
-  /** Shelf mode: seed of the gallery shown (its materials come from the surrounding provider). */
-  seed?: number;
-  /** Wall (1..5) the visitor is facing when the scene opens. */
+/** Titled volumes on one shelf, drawn one by one with that shelf in focus. */
+export interface ShelfDetail {
   wall: number;
-  /** Titled volumes for the close-up shelf (shelf mode). */
-  detail?: { shelf: number; titles: string[] };
+  shelf: number;
+  titles: string[];
+}
+
+/** A volume that is off its shelf, and the gallery it belongs to. */
+export interface HiddenVolume {
+  level: number;
+  side: GallerySide;
+  wall: number;
+  shelf: number;
+  volume: number;
+}
+
+export interface GalleryWorldProps {
+  /** Address of the gallery the world is built around (level 0, side "a"); every other gallery derives from it. */
+  worldHex: string;
+  /** Where the eye starts; read when the world mounts. */
+  initialPose: WalkPose;
+  /** The gallery that eye is in (level 0, side "a" when omitted); read when the world mounts. */
+  initialPlace?: { level: number; side: GallerySide };
   controlsRef?: Ref<GalleryControlsHandle>;
+  /**
+   * "walk": the visitor walks and the world follows them from gallery to gallery. "shelf": the current gallery
+   * answers the pointer but nobody walks. "none": nothing answers.
+   */
+  interactive: "walk" | "shelf" | "none";
+  /** Titled volumes on a shelf of the current gallery. */
+  detail: ShelfDetail | null;
+  /** A volume that is off its shelf, handed down to its gallery. */
+  hidden: HiddenVolume | null;
+  /** The shelf of the current gallery the spot light falls on; the spot is dark while null. */
+  shelfSpot: { wall: number; shelf: number } | null;
+  /** The desk lamp lit in the current gallery, and how brightly; the lamp is dark while null. */
+  deskLamp: { wall: number; intensity: number } | null;
+  /** Takes the desk lamp's light, which a flight brightens and dims frame by frame without re-rendering the world. */
+  deskLightRef?: Ref<THREE.PointLight>;
+  /** Fires once, when the gallery the visitor starts in has loaded. */
+  onCurrentCellReady?: () => void;
   onHoverBook?: (book: BookRef | null) => void;
   onClickBook?: (book: BookRef) => void;
   onHoverShelf?: (wall: number, shelf: number | null) => void;
@@ -222,7 +251,7 @@ function Railing({ simple = false }: { simple?: boolean }) {
 }
 
 /* ── One of Borges' spherical lamps (the light itself comes from the light pool) ── */
-function Lamp({ position, intensity, light = false }: { position: [number, number, number]; intensity?: number; light?: boolean }) {
+function Lamp({ position }: { position: [number, number, number] }) {
   const materials = useLibraryMaterials();
   return (
     <group position={position}>
@@ -232,7 +261,6 @@ function Lamp({ position, intensity, light = false }: { position: [number, numbe
       <mesh material={materials.lamp}>
         <sphereGeometry args={[0.13, 20, 16]} />
       </mesh>
-      {light && <pointLight color={LAMP_COLOR} intensity={intensity ?? 13} distance={13} decay={2} />}
     </group>
   );
 }
@@ -276,7 +304,7 @@ function DistantLevel() {
 }
 
 /* ── The spiral staircase: treads, balusters, handrails, newels and pole through the nearby levels ── */
-function Staircase() {
+const Staircase = memo(function Staircase() {
   const materials = useLibraryMaterials();
   const treadsRef = useRef<THREE.InstancedMesh>(null);
   const balustersRef = useRef<THREE.InstancedMesh>(null);
@@ -360,10 +388,10 @@ function Staircase() {
       </instancedMesh>
     </group>
   );
-}
+});
 
 /* ── Floor, ceiling and (when full) walls, closets and doorways of a vestibule ── */
-function VestibuleShell({ full, lampLight = false }: { full: boolean; lampLight?: boolean }) {
+function VestibuleShell({ full }: { full: boolean }) {
   const materials = useLibraryMaterials();
   const depth = ROOM.vestibuleDepth;
   const halfW = ROOM.vestibuleWidth / 2;
@@ -446,7 +474,7 @@ function VestibuleShell({ full, lampLight = false }: { full: boolean; lampLight?
             <boxGeometry args={[1.19, 1.84, 0.02]} />
           </mesh>
 
-          <Lamp position={[0.5, 3.05, -depth / 2]} intensity={4} light={lampLight} />
+          <Lamp position={[0.5, 3.05, -depth / 2]} />
         </>
       )}
     </group>
@@ -454,7 +482,7 @@ function VestibuleShell({ full, lampLight = false }: { full: boolean; lampLight?
 }
 
 /* ── "A mirror that faithfully duplicates appearances" ── */
-function Mirror() {
+const Mirror = memo(function Mirror() {
   const depth = ROOM.vestibuleDepth;
   const halfW = ROOM.vestibuleWidth / 2;
   const mirror = useMemo(() => {
@@ -463,7 +491,7 @@ function Mirror() {
   }, []);
   useEffect(() => () => mirror.dispose(), [mirror]);
   return <primitive object={mirror} position={[halfW - 0.03, 1.62, -depth / 2 + 0.2]} rotation={[0, -Math.PI / 2, 0]} />;
-}
+});
 
 /* ── One hexagonal gallery: floor, ceiling, five walls of shelves, the shaft railing, two lamps ── */
 interface GalleryRoomProps {
@@ -473,15 +501,29 @@ interface GalleryRoomProps {
   /** Wall (1..5) that carries `detail` and the focused shelf. */
   detailWall?: number;
   focusShelf?: number;
-  lampLight?: boolean;
-  lampIntensity?: number;
+  /** A volume of this gallery that is off its shelf. */
+  hidden?: HiddenVolume;
+  /** Wall (1..5) whose desk lamp glows; only set for the gallery the visitor stands in. */
+  deskLampWall?: number;
   onHoverBook?: (book: BookRef | null) => void;
   onClickBook?: (book: BookRef) => void;
   onHoverShelf?: (wall: number, shelf: number | null) => void;
   onClickShelf?: (wall: number, shelf: number) => void;
 }
 
-function GalleryRoom({ seed, interactive, detail, detailWall, focusShelf, lampLight = false, lampIntensity, onHoverBook, onClickBook, onHoverShelf, onClickShelf }: GalleryRoomProps) {
+function GalleryRoom({
+  seed,
+  interactive,
+  detail,
+  detailWall,
+  focusShelf,
+  hidden,
+  deskLampWall,
+  onHoverBook,
+  onClickBook,
+  onHoverShelf,
+  onClickShelf,
+}: GalleryRoomProps) {
   const materials = useLibraryMaterials();
   const wallPlane = useMemo(() => {
     const m = materials.wall.clone();
@@ -510,10 +552,11 @@ function GalleryRoom({ seed, interactive, detail, detailWall, focusShelf, lampLi
             <Bookcase
               wall={i + 1}
               seed={seed}
-              position={[Math.cos(a) * (r - 0.012), 0, Math.sin(a) * (r - 0.012)]}
+              position={[Math.cos(a) * BOOKCASE_RADIUS, 0, Math.sin(a) * BOOKCASE_RADIUS]}
               rotationY={rot}
               detail={detail && i + 1 === detailWall ? detail : undefined}
               focusShelf={i + 1 === detailWall ? focusShelf : undefined}
+              hidden={hidden && i + 1 === hidden.wall ? { shelf: hidden.shelf, volume: hidden.volume } : undefined}
               interactive={interactive}
               onHoverBook={onHoverBook}
               onClickBook={onClickBook}
@@ -524,45 +567,49 @@ function GalleryRoom({ seed, interactive, detail, detailWall, focusShelf, lampLi
         );
       })}
       <Railing />
-      <Lamp position={[2.3, 3.05, 0]} light={lampLight} intensity={lampIntensity} />
-      <Lamp position={[-2.3, 3.05, 0]} light={lampLight} intensity={lampIntensity} />
+      {Array.from({ length: 5 }, (_, i) => (
+        <ReadingDesk key={i} wall={i + 1} lit={i + 1 === deskLampWall} />
+      ))}
+      <Lamp position={[2.3, 3.05, 0]} />
+      <Lamp position={[-2.3, 3.05, 0]} />
     </group>
   );
 }
 
-/* ── A warm spot on the shelf being read, so it stands out from the wall (shelf mode) ── */
-function ShelfSpot({ side, shelf }: { side: number; shelf: number }) {
-  const target = useMemo(() => new THREE.Object3D(), []);
-  const a = sideAngle(side);
-  const r = ROOM.apothem - 0.012;
-  const y = shelfPlankY(shelf) + CASE.shelfThickness / 2 + CASE.bookH / 2;
+/* ═══════════════════════════════ The endless world ═══════════════════════════════ */
+
+/** Where the shelf spot hangs and what it aims at, for a shelf of the gallery at (level, side): warm light, so the shelf stands out from the wall. */
+function shelfSpotAt(level: number, side: GallerySide, wall: number, shelf: number) {
+  const a = sideAngle(wall - 1);
   const ux = Math.cos(a);
   const uz = Math.sin(a);
-  return (
-    <>
-      <primitive object={target} position={[ux * (r - 0.15), y, uz * (r - 0.15)]} />
-      <spotLight
-        position={[ux * (r - 1.7), y + 1.35, uz * (r - 1.7)]}
-        target={target}
-        angle={0.4}
-        penumbra={0.8}
-        intensity={38}
-        distance={8}
-        decay={2}
-        color="#ffdcae"
-      />
-    </>
-  );
+  const r = BOOKCASE_RADIUS;
+  const y = shelfPlankY(shelf) + CASE.shelfThickness / 2 + CASE.bookH / 2;
+  return {
+    position: galleryToWorld(level, side, { x: ux * (r - 1.7), y: y + 1.35, z: uz * (r - 1.7) }).toArray(),
+    target: galleryToWorld(level, side, { x: ux * (r - 0.15), y, z: uz * (r - 0.15) }).toArray(),
+  };
 }
 
-/* ═══════════════════════════════ The endless world (walk mode) ═══════════════════════════════ */
-
 /**
- * A fixed set of lights that follows the visitor: the lamps of both galleries of the current level
- * and the vestibule lamps of the neighbouring levels. Keeping the number of lights constant means
- * no shader is ever recompiled while walking from gallery to gallery.
+ * A fixed set of lights that follows the visitor: the lamps of both galleries of the current level,
+ * the vestibule lamps of the neighbouring levels, and a spot for the shelf being read in the current
+ * gallery (dark away from the close-up). Keeping the number of lights constant means no shader is ever
+ * recompiled while walking from gallery to gallery or going to a shelf.
  */
-function LightPool({ level }: { level: number }) {
+function LightPool({
+  level,
+  side,
+  shelfSpot,
+  deskLamp,
+  deskLightRef,
+}: {
+  level: number;
+  side: GallerySide;
+  shelfSpot: { wall: number; shelf: number } | null;
+  deskLamp: { wall: number; intensity: number } | null;
+  deskLightRef?: Ref<THREE.PointLight>;
+}) {
   const y = level * LEVEL_H;
   const a = galleryCenter("a", level);
   const b = galleryCenter("b", level);
@@ -572,6 +619,12 @@ function LightPool({ level }: { level: number }) {
     [b[0] + 2.3, y + 3.05, b[2]],
     [b[0] - 2.3, y + 3.05, b[2]],
   ];
+  const spotTarget = useMemo(() => new THREE.Object3D(), []);
+  const spotWall = shelfSpot?.wall ?? 1;
+  const spotShelf = shelfSpot?.shelf ?? 1;
+  const spot = useMemo(() => shelfSpotAt(level, side, spotWall, spotShelf), [level, side, spotWall, spotShelf]);
+  const deskLampWall = deskLamp?.wall ?? 1;
+  const deskLampPos = useMemo(() => galleryToWorld(level, side, deskLampLocal(deskLampWall)).toArray(), [level, side, deskLampWall]);
   return (
     <group>
       {lamps.map((p, i) => (
@@ -582,8 +635,28 @@ function LightPool({ level }: { level: number }) {
       {[-1, 0, 1].map((k) => (
         <pointLight key={`v${k}`} position={vestibulePoint(level + k, 0.5, 3.05, -ROOM.vestibuleDepth / 2)} color={LAMP_COLOR} intensity={4} distance={13} decay={2} />
       ))}
+      <primitive object={spotTarget} position={spot.target} />
+      <spotLight
+        position={spot.position}
+        target={spotTarget}
+        angle={0.4}
+        penumbra={0.8}
+        intensity={shelfSpot ? 38 : 0}
+        distance={8}
+        decay={2}
+        color="#ffdcae"
+      />
+      <pointLight ref={deskLightRef} position={deskLampPos} color={LAMP_COLOR} intensity={deskLamp?.intensity ?? 0} distance={3} decay={2} />
     </group>
   );
+}
+
+/** Tells its gallery cell that the content of the cell's Suspense boundary has mounted. */
+function CellReady({ onReady }: { onReady: () => void }) {
+  useEffect(() => {
+    onReady();
+  }, [onReady]);
+  return null;
 }
 
 interface GalleryCellProps {
@@ -591,28 +664,71 @@ interface GalleryCellProps {
   level: number;
   side: GallerySide;
   interactive: boolean;
+  detail: ShelfDetail | null;
+  hidden: HiddenVolume | null;
+  /** Wall (1..5) whose desk lamp glows; only set for the gallery the visitor stands in. */
+  deskLampWall?: number;
+  /** Called when the cell has loaded and mounted. */
+  onReady?: () => void;
   onHoverBook?: (book: BookRef | null) => void;
   onClickBook?: (book: BookRef) => void;
   onHoverShelf?: (wall: number, shelf: number | null) => void;
   onClickShelf?: (wall: number, shelf: number) => void;
 }
 
-/** One gallery of the world with its own materials; loads in the background behind its own Suspense boundary. */
-function GalleryCell({ worldHex, level, side, interactive, onHoverBook, onClickBook, onHoverShelf, onClickShelf }: GalleryCellProps) {
+/**
+ * One gallery of the world with its own materials; loads in the background behind its own Suspense boundary.
+ * Memoised, like the world's other parts: what changes for one gallery (a volume taken off its shelf, a lamp lit, a
+ * shelf in close-up) re-renders that gallery only, and a flight starting or landing does not stall on the rest.
+ */
+const GalleryCell = memo(function GalleryCell({
+  worldHex,
+  level,
+  side,
+  interactive,
+  detail,
+  hidden,
+  deskLampWall,
+  onReady,
+  onHoverBook,
+  onClickBook,
+  onHoverShelf,
+  onClickShelf,
+}: GalleryCellProps) {
   const seed = useMemo(() => hashString(cellHex(worldHex, level, side)), [worldHex, level, side]);
+  // One object per shelf and set of titles: a new object would draw every titled spine again.
+  const detailShelf = detail?.shelf;
+  const detailTitles = detail?.titles;
+  const shelfDetail = useMemo(
+    () => (detailShelf !== undefined && detailTitles ? { shelf: detailShelf, titles: detailTitles } : undefined),
+    [detailShelf, detailTitles]
+  );
   return (
     <Suspense fallback={null}>
       <LibraryMaterialsProvider seed={seed}>
         <group position={galleryCenter(side, level)} rotation={[0, galleryRotation(side), 0]}>
-          <GalleryRoom seed={seed} interactive={interactive} onHoverBook={onHoverBook} onClickBook={onClickBook} onHoverShelf={onHoverShelf} onClickShelf={onClickShelf} />
+          <GalleryRoom
+            seed={seed}
+            interactive={interactive}
+            detail={shelfDetail}
+            detailWall={detail?.wall}
+            focusShelf={detailShelf}
+            hidden={hidden ?? undefined}
+            deskLampWall={deskLampWall}
+            onHoverBook={onHoverBook}
+            onClickBook={onClickBook}
+            onHoverShelf={onHoverShelf}
+            onClickShelf={onClickShelf}
+          />
         </group>
+        {onReady && <CellReady onReady={onReady} />}
       </LibraryMaterialsProvider>
     </Suspense>
   );
-}
+});
 
 /** The vestibule of a level, dressed like its gallery A. */
-function VestibuleCell({ worldHex, level }: { worldHex: string; level: number }) {
+const VestibuleCell = memo(function VestibuleCell({ worldHex, level }: { worldHex: string; level: number }) {
   const seed = useMemo(() => hashString(cellHex(worldHex, level, "a")), [worldHex, level]);
   const frame = vestibuleFrame(level);
   return (
@@ -624,10 +740,10 @@ function VestibuleCell({ worldHex, level }: { worldHex: string; level: number })
       </LibraryMaterialsProvider>
     </Suspense>
   );
-}
+});
 
 /** Far-off levels of both galleries, seen through the shafts, dressed like the gallery the visitor is in. */
-function DistantWorld({ seed, level }: { seed: number; level: number }) {
+const DistantWorld = memo(function DistantWorld({ seed, level }: { seed: number; level: number }) {
   const ks = useMemo(() => {
     const out: number[] = [];
     for (let k = level - ROOM.levelsBelow; k <= level + ROOM.levelsAbove; k++) if (Math.abs(k - level) > 1) out.push(k);
@@ -655,7 +771,7 @@ function DistantWorld({ seed, level }: { seed: number; level: number }) {
       </LibraryMaterialsProvider>
     </Suspense>
   );
-}
+});
 
 function PreloadAllTextures() {
   useEffect(() => {
@@ -664,13 +780,26 @@ function PreloadAllTextures() {
   return null;
 }
 
-type WorldCallbacks = Pick<HexGallerySceneProps, "onFacingSide" | "onPlace">;
+type WorldCallbacks = Pick<GalleryWorldProps, "onFacingSide" | "onPlace" | "onCurrentCellReady">;
 
-/** Memoised: HUD state changes (tooltips, banners) must not re-render the world. */
+/**
+ * The endless world around one address: the galleries of the visitor's level and the levels next to it, the
+ * stair, the far levels, and the controls. It stays on the stage while the visitor walks or reads a shelf;
+ * what the controls do is set from outside through `controlsRef`. Memoised: HUD state changes (tooltips,
+ * banners) must not re-render the world.
+ */
 const GalleryWorld = memo(function GalleryWorld({
   worldHex,
-  wall,
+  initialPose,
+  initialPlace,
   controlsRef,
+  interactive,
+  detail,
+  hidden,
+  shelfSpot,
+  deskLamp,
+  deskLightRef,
+  onCurrentCellReady,
   onHoverBook,
   onClickBook,
   onHoverShelf,
@@ -679,18 +808,39 @@ const GalleryWorld = memo(function GalleryWorld({
   onPlace,
   onInteract,
   onLockChange,
-}: Omit<HexGallerySceneProps, "mode" | "seed" | "detail"> & { worldHex: string }) {
-  const [current, setCurrent] = useState<{ level: number; side: GallerySide }>({ level: 0, side: "a" });
+}: GalleryWorldProps) {
+  const [current, setCurrent] = useState<{ level: number; side: GallerySide }>(() => initialPlace ?? { level: 0, side: "a" });
   const currentRef = useRef(current);
-  const callbacks = useRef<WorldCallbacks>({ onFacingSide, onPlace });
+  const callbacks = useRef<WorldCallbacks>({ onFacingSide, onPlace, onCurrentCellReady });
+  // Read by `onFrame`, a render-loop callback memoised per world: never from its closure.
+  const walking = useRef(interactive === "walk");
   useLayoutEffect(() => {
-    callbacks.current = { onFacingSide, onPlace };
+    callbacks.current = { onFacingSide, onPlace, onCurrentCellReady };
+    walking.current = interactive === "walk";
   });
   const lastSide = useRef(-1);
   const feet = useRef(new THREE.Vector3());
+  // The controls take the starting eye once, when they mount.
+  const [start] = useState(() => ({
+    position: [initialPose.position.x, initialPose.position.y, initialPose.position.z] as [number, number, number],
+    yaw: initialPose.yaw,
+    pitch: initialPose.pitch,
+  }));
+
+  const cellReported = useRef(false);
+  const reportCellReady = useCallback(() => {
+    if (cellReported.current) return;
+    cellReported.current = true;
+    callbacks.current.onCurrentCellReady?.();
+  }, []);
 
   const onFrame = useCallback(
     (yaw: number, position: THREE.Vector3) => {
+      // Only a walking visitor goes from gallery to gallery and turns to face walls; a close-up hangs over the shaft.
+      if (!walking.current) {
+        lastSide.current = -1;
+        return;
+      }
       const cur = currentRef.current;
       feet.current.set(position.x, position.y - ROOM.eyeHeight, position.z);
       const cell = cellAt(feet.current);
@@ -711,7 +861,6 @@ const GalleryWorld = memo(function GalleryWorld({
     [worldHex]
   );
 
-  const camera = useMemo(() => ({ position: viewpointForSide(wall - 1), yaw: sideYaw(wall - 1) }), [wall]);
   const levels = useMemo(() => [current.level - 1, current.level, current.level + 1], [current.level]);
   const currentSeed = useMemo(() => hashString(cellHex(worldHex, current.level, current.side)), [worldHex, current]);
   // The stair spans several levels around the visitor and one turn of it is one level, so when the
@@ -722,9 +871,9 @@ const GalleryWorld = memo(function GalleryWorld({
     <group>
       <GalleryControls
         ref={controlsRef}
-        initialPosition={camera.position}
-        initialYaw={camera.yaw}
-        initialPitch={-0.04}
+        initialPosition={start.position}
+        initialYaw={start.yaw}
+        initialPitch={start.pitch}
         walk
         pointerLock
         eyeHeight={ROOM.eyeHeight}
@@ -740,23 +889,30 @@ const GalleryWorld = memo(function GalleryWorld({
 
       <fog attach="fog" args={["#07060a", 4, 24]} />
       <hemisphereLight args={["#5a5270", "#1a140c", 0.85]} />
-      <LightPool level={current.level} />
+      <LightPool level={current.level} side={current.side} shelfSpot={shelfSpot} deskLamp={deskLamp} deskLightRef={deskLightRef} />
 
       {levels.map((k) => (
         <Fragment key={k}>
-          {(["a", "b"] as const).map((side) => (
-            <GalleryCell
-              key={side}
-              worldHex={worldHex}
-              level={k}
-              side={side}
-              interactive={k === current.level && side === current.side}
-              onHoverBook={onHoverBook}
-              onClickBook={onClickBook}
-              onHoverShelf={onHoverShelf}
-              onClickShelf={onClickShelf}
-            />
-          ))}
+          {(["a", "b"] as const).map((side) => {
+            const here = k === current.level && side === current.side;
+            return (
+              <GalleryCell
+                key={side}
+                worldHex={worldHex}
+                level={k}
+                side={side}
+                interactive={here && interactive !== "none"}
+                detail={here ? detail : null}
+                hidden={hidden && hidden.level === k && hidden.side === side ? hidden : null}
+                deskLampWall={here ? deskLamp?.wall : undefined}
+                onReady={here ? reportCellReady : undefined}
+                onHoverBook={onHoverBook}
+                onClickBook={onClickBook}
+                onHoverShelf={onHoverShelf}
+                onClickShelf={onClickShelf}
+              />
+            );
+          })}
           <VestibuleCell worldHex={worldHex} level={k} />
         </Fragment>
       ))}
@@ -771,87 +927,7 @@ const GalleryWorld = memo(function GalleryWorld({
   );
 });
 
-/* ═══════════════════════════════ One shelf, close up (shelf mode) ═══════════════════════════════ */
-
-function ShelfView({
-  seed = 0,
-  wall,
-  detail,
-  controlsRef,
-  onHoverBook,
-  onClickBook,
-  onHoverShelf,
-  onClickShelf,
-  onInteract,
-}: Omit<HexGallerySceneProps, "mode" | "worldHex">) {
-  const materials = useLibraryMaterials();
-  const side = wall - 1;
-  const shelf = detail?.shelf ?? 4;
-
-  const camera = useMemo(() => {
-    const bookY = shelfPlankY(shelf) + CASE.shelfThickness / 2 + CASE.bookH / 2;
-    const eye = THREE.MathUtils.clamp(bookY, 1.05, 2.45);
-    const position = closeupForSide(side, 2.6);
-    position[1] = eye;
-    const yaw = sideYaw(side);
-    const pitch = Math.atan2(bookY - eye, 2.6);
-    return { position, yaw, pitch, yawRange: [yaw - 0.55, yaw + 0.55] as [number, number] };
-  }, [side, shelf]);
-
-  const frame = vestibuleFrame(0);
-  const distant = useMemo(() => {
-    const ks: number[] = [];
-    for (let k = -ROOM.levelsBelow; k <= ROOM.levelsAbove; k++) if (k !== 0) ks.push(k);
-    return ks;
-  }, []);
-
-  return (
-    <group>
-      <GalleryControls
-        ref={controlsRef}
-        initialPosition={camera.position}
-        initialYaw={camera.yaw}
-        initialPitch={camera.pitch}
-        yawRange={camera.yawRange}
-        pitchRange={[-0.45, 0.45]}
-        fovRange={[26, 62]}
-        initialFov={50}
-        onInteract={onInteract}
-      />
-      <fog attach="fog" args={["#07060a", 4, 24]} />
-      <hemisphereLight args={["#5a5270", "#1a140c", 0.5]} />
-      <GalleryRoom
-        seed={seed}
-        interactive
-        detail={detail}
-        detailWall={wall}
-        focusShelf={detail?.shelf}
-        lampLight
-        lampIntensity={materials.plan.lampIntensity * 0.55}
-        onHoverBook={onHoverBook}
-        onClickBook={onClickBook}
-        onHoverShelf={onHoverShelf}
-        onClickShelf={onClickShelf}
-      />
-      <pointLight position={[0, 2.4, 0]} color="#e9c99a" intensity={1.5} distance={10} decay={2} />
-      {detail && <ShelfSpot side={side} shelf={detail.shelf} />}
-      <group position={frame.position} rotation={[0, frame.rotation, 0]}>
-        <VestibuleShell full lampLight />
-        <Staircase />
-      </group>
-      {distant.map((k) => (
-        <group key={k} position={[0, k * LEVEL_H, 0]}>
-          <DistantLevel />
-        </group>
-      ))}
-    </group>
-  );
-}
-
-export default function HexGalleryScene(props: HexGallerySceneProps) {
-  if (props.mode === "shelf" || !props.worldHex) return <ShelfView {...props} />;
-  return <GalleryWorld {...props} worldHex={props.worldHex} />;
-}
+export default GalleryWorld;
 
 export type { BookRef };
 export { LIBRARY };

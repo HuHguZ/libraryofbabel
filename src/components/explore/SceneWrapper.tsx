@@ -4,7 +4,7 @@ import { Canvas, events as defaultEvents, type RootState } from "@react-three/fi
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { Box, Text } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { Suspense, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import * as THREE from "three";
 import { LibraryMaterialsProvider } from "./materials";
@@ -16,13 +16,20 @@ interface SceneWrapperProps {
   seed?: number;
   /** Bloom + vignette post-processing (on by default). */
   post?: boolean;
+  /** Shows the veil again after the first scene is up (a stage rebuilding what it shows). */
+  veil?: boolean;
   onReady?: () => void;
 }
 
 function ReadySignal({ onReady }: { onReady: () => void }) {
+  const latest = useRef(onReady);
+  useLayoutEffect(() => {
+    latest.current = onReady;
+  });
+  // Once, when the scene first mounts: the wrapper re-rendering (a new `veil`) must not report it ready again.
   useEffect(() => {
-    onReady();
-  }, [onReady]);
+    latest.current();
+  }, []);
   return null;
 }
 
@@ -50,7 +57,7 @@ const sceneEvents = (store: Parameters<typeof defaultEvents>[0]) => {
  * Full-bleed WebGL stage. Textures and materials are provided to every scene,
  * and a loading veil is shown until the scene has actually mounted.
  */
-export default function SceneWrapper({ children, seed = 0, post = true, onReady }: SceneWrapperProps) {
+export default function SceneWrapper({ children, seed = 0, post = true, veil, onReady }: SceneWrapperProps) {
   const t = useTranslations("Explore");
   const [ready, setReady] = useState(false);
 
@@ -88,7 +95,7 @@ export default function SceneWrapper({ children, seed = 0, post = true, onReady 
       </Canvas>
 
       <AnimatePresence>
-        {!ready && (
+        {(!ready || veil === true) && (
           <motion.div
             key="veil"
             initial={{ opacity: 1 }}

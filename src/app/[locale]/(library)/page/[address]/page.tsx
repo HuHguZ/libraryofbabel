@@ -1,26 +1,22 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Box, Flex, Input, Text } from "@chakra-ui/react";
 import { AnimatePresence } from "motion/react";
-import PageTransition from "@/components/PageTransition";
-import ExploreHud, { ExploreStage, HudButton } from "@/components/explore/ExploreHud";
+import ExploreHud, { HudButton, HudLayer } from "@/components/explore/ExploreHud";
 import ReaderTextPanel from "@/components/explore/ReaderTextPanel";
 import { useLoupe } from "@/components/explore/loupe/useLoupe";
+import { useStageDesk, useStageHandlers, useStageSelector, useStageView } from "@/components/explore/stage/StageProvider";
+import type { StageView } from "@/components/explore/stage/stageStore";
 import { useLocalizedPath, useRouter } from "@/i18n/navigation";
 import { normalizeQuery } from "@/lib/alphabet";
 import { formatFragment, fragmentReducer, parseFragment, shownFragment, type TextFragment } from "@/lib/fragment";
-import { hashString, shortHex } from "@/lib/hex";
+import { shortHex } from "@/lib/hex";
 import { spreadMatches, stepMatch } from "@/lib/matches";
 import { useFragmentColor } from "@/lib/fragmentColor";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
-
-const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), { ssr: false });
-const ReaderScene = dynamic(() => import("@/components/explore/ReaderScene"), { ssr: false });
-const Loupe = dynamic(() => import("@/components/explore/loupe/Loupe"), { ssr: false });
 
 const mono = "var(--font-jetbrains), monospace";
 const serif = "var(--font-cormorant), Georgia, serif";
@@ -95,14 +91,16 @@ export default function PageView() {
 
   if (!address) {
     return (
-      <Box maxW="640px" mx="auto" px={4} py={20} textAlign="center">
-        <Text color="brand.300" fontSize="2xl" fontFamily={serif}>
-          {t("notFoundTitle")}
-        </Text>
-        <Text color="dark.100" mt={3} fontFamily={serif} fontStyle="italic">
-          {t("notFoundText")}
-        </Text>
-      </Box>
+      <HudLayer>
+        <Box maxW="640px" mx="auto" px={4} py={20} textAlign="center">
+          <Text color="brand.300" fontSize="2xl" fontFamily={serif}>
+            {t("notFoundTitle")}
+          </Text>
+          <Text color="dark.100" mt={3} fontFamily={serif} fontStyle="italic">
+            {t("notFoundText")}
+          </Text>
+        </Box>
+      </HudLayer>
     );
   }
   return <Reader key={raw} address={address} initialQuery={initialQuery} initialFragment={initialFragment} />;
@@ -134,13 +132,18 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   const [matchCursor, setMatchCursor] = useState({ key: "", index: 0, step: 0 });
   const [tooltip, setTooltip] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(true);
-  const [ready, setReady] = useState(false);
+  const ready = useStageSelector((s) => s.ready);
+  const moving = useStageSelector((s) => s.moving);
   const loupe = useLoupe();
   const loadedRef = useRef(new Map<number, string>());
   const inFlightRef = useRef(new Set<number>());
 
-  const seed = useMemo(() => hashString(address.hex), [address.hex]);
   const hexQuery = `?hex=${encodeURIComponent(address.hex)}`;
+  const view = useMemo<StageView>(
+    () => ({ kind: "desk", book: { hex: address.hex, wall: address.wall, shelf: address.shelf, volume: address.volume }, mode: "read" }),
+    [address]
+  );
+  useStageView(view);
 
   // Fetch the pages of a spread and three spreads either way in one request; page turns never wait for the network.
   useEffect(() => {
@@ -193,11 +196,12 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
     return () => clearTimeout(timer);
   }, [input, locale]);
 
+  // The hint shows, and its time runs, once the book has landed in a visible scene.
   useEffect(() => {
-    if (!ready || !showHint) return;
+    if (!ready || moving || !showHint) return;
     const timer = setTimeout(() => setShowHint(false), 12000);
     return () => clearTimeout(timer);
-  }, [ready, showHint]);
+  }, [ready, moving, showHint]);
 
   // Turns can come faster than renders (a held key, quick clicks): each one counts from the last, not from the last render.
   const spreadRef = useRef(spread);
@@ -303,136 +307,128 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   // Rendered on the server too, where there is no origin; the link is only read when it is copied.
   const shareUrl = sharePath && typeof window !== "undefined" ? `${window.location.origin}${sharePath}` : sharePath;
 
-  return (
-    <PageTransition>
-      <ExploreStage>
-        <SceneWrapper seed={seed} onReady={() => setReady(true)}>
-          <ReaderScene
-            title={title}
-            wall={address.wall}
-            shelf={address.shelf}
-            volume={address.volume}
-            spread={spread}
-            contents={contents}
-            query={query}
-            focusToken={focusToken}
-            currentMatch={currentMatch}
-            matchStep={matchCursor.step}
-            mark={marked}
-            markColor={fragmentColor}
-            markFocusToken={fragmentFocus.n ? String(fragmentFocus.n) : undefined}
-            onHoverPage={onHoverPage}
-            onTurn={go}
-            onInteract={() => setShowHint(false)}
-          />
-          <Loupe active={loupe.active} />
-        </SceneWrapper>
+  // The book on the stage shows what this page holds; the store passes on only what changed.
+  useStageDesk({
+    title,
+    spread,
+    contents,
+    query,
+    focusToken,
+    currentMatch,
+    matchStep: matchCursor.step,
+    mark: marked,
+    markColor: fragmentColor,
+    markFocusToken: fragmentFocus.n ? String(fragmentFocus.n) : undefined,
+    loupe: loupe.active,
+  });
+  useStageHandlers({ onHoverTurn: onHoverPage, onTurn: go, onInteract: () => setShowHint(false) });
 
-        <ExploreHud
-          kicker={t("kicker", { wall: address.wall, shelf: address.shelf })}
-          title={shownTitle}
-          galleryLabel={shortHex(address.hex)}
-          back={{ href: `/explore/wall/${address.wall}/shelf/${address.shelf}/volume/${address.volume}${hexQuery}`, label: explore("backVolume", { n: address.volume }) }}
-          showHint={ready && showHint}
-          hint={
-            <>
-              {t("hint")}
-              <Box as="span" display={{ base: "none", md: "inline" }}>{t("hintDesktop")}</Box>
-            </>
-          }
-          // The loupe stands in for the cursor: a tooltip beside it would cover the glass.
-          tooltip={loupe.active ? null : tooltip}
-          rightPanel={textOpen ? "min(600px, 100%)" : null}
-          extra={
-            <AnimatePresence>
-              {textOpen && (
-                <ReaderTextPanel
-                  key="text"
-                  hex={address.hex}
-                  wall={address.wall}
-                  shelf={address.shelf}
-                  volume={address.volume}
-                  pages={pages}
-                  contents={contents}
-                  query={query}
-                  page={rightPage(spread)}
-                  address={currentAddress}
-                  fragment={fragments.mark}
-                  live={fragments.live}
-                  shareUrl={shareUrl}
-                  scrollToken={fragmentFocus.spread === spread ? fragmentFocus.n : 0}
-                  currentMatch={currentMatch}
-                  matchScrollToken={matchCursor.key === matchKey ? matchCursor.step : 0}
-                  onSelection={onSelection}
-                  onShare={settleSelection}
-                  onShow={showFragment}
-                  onClear={clearFragment}
-                  onClose={() => setTextOpen(false)}
-                />
-              )}
-            </AnimatePresence>
-          }
-        >
-          <Flex align="center" gap={2} flexWrap="wrap" justify="center">
-            <HudButton onClick={() => go(-1)} title={t("prevTitle")}>
-              {t("prev")}
-            </HudButton>
-            <Text color="dark.50" fontSize="xs" fontFamily={mono} px={2} whiteSpace="nowrap">
-              {label} <Box as="span" color="dark.200">/ {LIBRARY.pages}</Box>
-            </Text>
-            <HudButton onClick={() => go(1)} title={t("nextTitle")}>
-              {t("next")}
-            </HudButton>
-            <Box w="1px" h="20px" bg="dark.400/50" mx={1} display={{ base: "none", sm: "block" }} />
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                stepSearch(e.shiftKey ? -1 : 1);
-              }}
-              placeholder={t("findPlaceholder")}
-              title={t("findTitle")}
-              size="xs"
-              w={{ base: "150px", md: "200px" }}
-              bg="rgba(7,6,10,0.6)"
-              border="1px solid"
-              borderColor="dark.400/50"
-              color="parchment.200"
-              fontFamily={mono}
-              fontSize="xs"
-              borderRadius="4px"
-              _placeholder={{ color: "dark.200" }}
-              _focus={{ borderColor: "brand.300/60", boxShadow: "none" }}
-            />
-            {query &&
-              (matches.length ? (
-                <Flex align="center" gap={1}>
-                  <HudButton onClick={() => stepSearch(-1)} title={t("prevMatchTitle")}>
-                    ↑
-                  </HudButton>
-                  <Text color="brand.200" fontSize="xs" fontFamily={mono} whiteSpace="nowrap" minW="4.5em" textAlign="center">
-                    {t("matchOf", { current: matchIndex + 1, count: matches.length })}
-                  </Text>
-                  <HudButton onClick={() => stepSearch(1)} title={t("nextMatchTitle")}>
-                    ↓
-                  </HudButton>
-                </Flex>
-              ) : (
-                <Text color="dark.200" fontSize="xs" fontFamily={mono} whiteSpace="nowrap">
-                  {t("notOnSpread")}
+  return (
+    <HudLayer>
+      <ExploreHud
+        kicker={t("kicker", { wall: address.wall, shelf: address.shelf })}
+        title={shownTitle}
+        galleryLabel={shortHex(address.hex)}
+        back={{ href: `/explore/wall/${address.wall}/shelf/${address.shelf}/volume/${address.volume}${hexQuery}`, label: explore("backVolume", { n: address.volume }) }}
+        showHint={ready && !moving && showHint}
+        hint={
+          <>
+            {t("hint")}
+            <Box as="span" display={{ base: "none", md: "inline" }}>{t("hintDesktop")}</Box>
+          </>
+        }
+        // The loupe stands in for the cursor: a tooltip beside it would cover the glass.
+        tooltip={loupe.active ? null : tooltip}
+        rightPanel={textOpen ? "min(600px, 100%)" : null}
+        extra={
+          <AnimatePresence>
+            {textOpen && (
+              <ReaderTextPanel
+                key="text"
+                hex={address.hex}
+                wall={address.wall}
+                shelf={address.shelf}
+                volume={address.volume}
+                pages={pages}
+                contents={contents}
+                query={query}
+                page={rightPage(spread)}
+                address={currentAddress}
+                fragment={fragments.mark}
+                live={fragments.live}
+                shareUrl={shareUrl}
+                scrollToken={fragmentFocus.spread === spread ? fragmentFocus.n : 0}
+                currentMatch={currentMatch}
+                matchScrollToken={matchCursor.key === matchKey ? matchCursor.step : 0}
+                onSelection={onSelection}
+                onShare={settleSelection}
+                onShow={showFragment}
+                onClear={clearFragment}
+                onClose={() => setTextOpen(false)}
+              />
+            )}
+          </AnimatePresence>
+        }
+      >
+        <Flex align="center" gap={2} flexWrap="wrap" justify="center">
+          <HudButton onClick={() => go(-1)} title={t("prevTitle")}>
+            {t("prev")}
+          </HudButton>
+          <Text color="dark.50" fontSize="xs" fontFamily={mono} px={2} whiteSpace="nowrap">
+            {label} <Box as="span" color="dark.200">/ {LIBRARY.pages}</Box>
+          </Text>
+          <HudButton onClick={() => go(1)} title={t("nextTitle")}>
+            {t("next")}
+          </HudButton>
+          <Box w="1px" h="20px" bg="dark.400/50" mx={1} display={{ base: "none", sm: "block" }} />
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              stepSearch(e.shiftKey ? -1 : 1);
+            }}
+            placeholder={t("findPlaceholder")}
+            title={t("findTitle")}
+            size="xs"
+            w={{ base: "150px", md: "200px" }}
+            bg="rgba(7,6,10,0.6)"
+            border="1px solid"
+            borderColor="dark.400/50"
+            color="parchment.200"
+            fontFamily={mono}
+            fontSize="xs"
+            borderRadius="4px"
+            _placeholder={{ color: "dark.200" }}
+            _focus={{ borderColor: "brand.300/60", boxShadow: "none" }}
+          />
+          {query &&
+            (matches.length ? (
+              <Flex align="center" gap={1}>
+                <HudButton onClick={() => stepSearch(-1)} title={t("prevMatchTitle")}>
+                  ↑
+                </HudButton>
+                <Text color="brand.200" fontSize="xs" fontFamily={mono} whiteSpace="nowrap" minW="4.5em" textAlign="center">
+                  {t("matchOf", { current: matchIndex + 1, count: matches.length })}
                 </Text>
-              ))}
-            <HudButton active={loupe.active} onClick={loupe.toggle} title={t("loupeTitle")}>
-              {t("loupe")}
-            </HudButton>
-            <HudButton active={textOpen} onClick={() => setTextOpen((o) => !o)}>
-              {t("textAndAddress")}
-            </HudButton>
-          </Flex>
-        </ExploreHud>
-      </ExploreStage>
-    </PageTransition>
+                <HudButton onClick={() => stepSearch(1)} title={t("nextMatchTitle")}>
+                  ↓
+                </HudButton>
+              </Flex>
+            ) : (
+              <Text color="dark.200" fontSize="xs" fontFamily={mono} whiteSpace="nowrap">
+                {t("notOnSpread")}
+              </Text>
+            ))}
+          <HudButton active={loupe.active} onClick={loupe.toggle} title={t("loupeTitle")}>
+            {t("loupe")}
+          </HudButton>
+          <HudButton active={textOpen} onClick={() => setTextOpen((o) => !o)}>
+            {t("textAndAddress")}
+          </HudButton>
+        </Flex>
+      </ExploreHud>
+    </HudLayer>
   );
 }

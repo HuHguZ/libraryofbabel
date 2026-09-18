@@ -1,35 +1,16 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import { useTranslations } from "next-intl";
 import { LIBRARY } from "@/lib/library";
-import { createRandom } from "@/lib/hex";
-import { TINT_GROUPS, useLibraryMaterials } from "./materials";
+import { useLibraryMaterials } from "./materials";
+import { CASE, planBookcase, shelfPlankY, type BookPlacement, type BookRef } from "./bookcasePlan";
 import { canvasTexture, createCanvas, loadSerifFont, makePlaqueTexture } from "./textTexture";
 import { setCanvasCursor } from "./cursor";
 
-/** Dimensions of one wall of shelves (metres). Local +z faces into the room, the back panel sits at z = 0. */
-export const CASE = {
-  width: 3.7,
-  height: 3.36,
-  depth: 0.32,
-  shelfDepth: 0.3,
-  shelfThickness: 0.035,
-  usableWidth: 3.5,
-  firstShelfY: 0.2,
-  shelfGap: 0.44,
-  bookW: 0.1,
-  bookH: 0.32,
-  bookD: 0.24,
-} as const;
-
-export interface BookRef {
-  wall: number;
-  shelf: number;
-  volume: number;
-}
+export { CASE, shelfPlankY, type BookRef } from "./bookcasePlan";
 
 export interface BookcaseProps {
   wall: number;
@@ -41,6 +22,8 @@ export interface BookcaseProps {
   detail?: { shelf: number; titles: string[] };
   /** When set, volumes of the other shelves neither highlight nor open (their planks still do). */
   focusShelf?: number;
+  /** A volume taken off its shelf: drawn nowhere (its instance is zero-scaled, no DetailedBook either). */
+  hidden?: { shelf: number; volume: number };
   interactive?: boolean;
   onHoverBook?: (book: BookRef | null) => void;
   onClickBook?: (book: BookRef) => void;
@@ -48,43 +31,31 @@ export interface BookcaseProps {
   onClickShelf?: (shelf: number) => void;
 }
 
-interface BookPlacement {
-  shelf: number;
-  volume: number;
-  x: number;
-  y: number;
-  z: number;
-  scaleY: number;
-}
-
-interface TintGroup {
-  tint: number;
-  books: BookPlacement[];
-}
-
-const BOOK_GEOMETRY = new THREE.BoxGeometry(CASE.bookW, CASE.bookH, CASE.bookD);
+export const BOOK_GEOMETRY = new THREE.BoxGeometry(CASE.bookW, CASE.bookH, CASE.bookD);
 const HIGHLIGHT_GEOMETRY = new THREE.BoxGeometry(CASE.bookW + 0.014, CASE.bookH + 0.014, CASE.bookD + 0.02);
 const SHELF_HIGHLIGHT_GEOMETRY = new THREE.BoxGeometry(CASE.usableWidth + 0.02, CASE.shelfThickness + 0.02, CASE.shelfDepth + 0.02);
-const PULL_OUT = 0.06;
+/** How far a volume under the pointer comes out of its row (m); a titled one of the close-up comes further. */
+export const PULL_OUT = 0.06;
+export const TITLED_PULL_OUT = PULL_OUT * 1.4;
 const dummy = new THREE.Object3D();
 
-/** Y of the plank of shelf `s` (1 = top, 7 = bottom). */
-export function shelfPlankY(shelf: number): number {
-  return CASE.firstShelfY + (LIBRARY.shelves - shelf) * CASE.shelfGap;
-}
-
-export function bookSpacing(): number {
-  return CASE.usableWidth / LIBRARY.volumes;
-}
-
-/** Local position of a volume on its shelf. */
-export function bookLocalPosition(shelf: number, volume: number, scaleY = 1): [number, number, number] {
-  const spacing = bookSpacing();
-  const x = -CASE.usableWidth / 2 + spacing * (volume - 1) + spacing / 2;
-  const y = shelfPlankY(shelf) + CASE.shelfThickness / 2 + (CASE.bookH * scaleY) / 2;
-  const z = 0.02 + CASE.bookD / 2;
-  return [x, y, z];
-}
+/** A throwaway 1×1 texture: filling a texture slot is what shapes a program, not what the texture shows. */
+const KEEP_WARM_TEXTURE = canvasTexture(createCanvas(1, 1)[0]);
+/**
+ * Same shape as the per-title spine clone `DetailedBook` makes below (map, color, emissiveMap, emissive,
+ * roughness, metalness) but never disposed. Rendered once, at zero scale, by `DeskBookWarmUp` (not once per
+ * bookcase — the world mounts up to 30 of these) so its program is compiled once and never evicted: opening
+ * a shelf close-up then reuses it instead of stalling on a fresh compile (spec 3.5 — program count stays
+ * constant across transitions).
+ */
+export const KEEP_WARM_SPINE = new THREE.MeshStandardMaterial({
+  map: KEEP_WARM_TEXTURE,
+  emissiveMap: KEEP_WARM_TEXTURE,
+  emissive: new THREE.Color("#ffd27a"),
+  emissiveIntensity: 0.5,
+  roughness: 0.62,
+  metalness: 0.05,
+});
 
 function useSerifFont(): string | null {
   const [family, setFamily] = useState<string | null>(null);
@@ -101,7 +72,7 @@ function useSerifFont(): string | null {
 }
 
 /** Gilt lines plus a title, drawn along the spine; used as emissive map so the gold stays gold. */
-function makeTitleGilt(title: string, family: string): THREE.CanvasTexture {
+export function makeTitleGilt(title: string, family: string): THREE.CanvasTexture {
   const W = 256;
   const H = 512;
   const [canvas, ctx] = createCanvas(W, H);
@@ -140,6 +111,7 @@ export default function Bookcase({
   rotationY = 0,
   detail,
   focusShelf,
+  hidden,
   interactive = true,
   onHoverBook,
   onClickBook,
@@ -159,36 +131,28 @@ export default function Bookcase({
   });
 
   /* ── Deterministic binding colours; runs of the same tint read as multi-volume series ── */
-  const { groups, tintOf } = useMemo(() => {
-    const rand = createRandom(seed * 7919 + wall * 104729);
-    const groupsByTint: TintGroup[] = Array.from({ length: TINT_GROUPS }, (_, tint) => ({ tint, books: [] }));
-    const tintOf = new Map<string, number>();
-    for (let shelf = 1; shelf <= LIBRARY.shelves; shelf++) {
-      let tint = Math.floor(rand() * TINT_GROUPS);
-      for (let volume = 1; volume <= LIBRARY.volumes; volume++) {
-        if (rand() > 0.72) tint = Math.floor(rand() * TINT_GROUPS);
-        const scaleY = 0.97 + rand() * 0.06;
-        tintOf.set(`${shelf}-${volume}`, tint);
-        if (detail && detail.shelf === shelf) continue;
-        const [x, y, z] = bookLocalPosition(shelf, volume, scaleY);
-        groupsByTint[tint].books.push({ shelf, volume, x, y, z, scaleY });
-      }
-    }
-    return { groups: groupsByTint.filter((g) => g.books.length > 0), tintOf };
-  }, [seed, wall, detail]);
+  const { groups, placements } = useMemo(() => planBookcase(seed, wall, detail?.shelf), [seed, wall, detail?.shelf]);
 
   const meshRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
   const highlightRef = useRef<THREE.Mesh>(null);
   const shelfHighlightRef = useRef<THREE.Mesh>(null);
   const hovered = useRef<{ group: number; index: number } | null>(null);
 
-  const writeInstance = (mesh: THREE.InstancedMesh, book: BookPlacement, index: number, pulled: boolean) => {
-    dummy.position.set(book.x, book.y, book.z + (pulled ? PULL_OUT : 0));
-    dummy.scale.set(1, book.scaleY, 1);
-    dummy.rotation.set(0, 0, 0);
-    dummy.updateMatrix();
-    mesh.setMatrixAt(index, dummy.matrix);
-  };
+  const hiddenShelf = hidden?.shelf;
+  const hiddenVolume = hidden?.volume;
+  // A stable identity (changing only with the shelf/volume that's off its shelf) keeps the effect below from
+  // rewriting every instance's matrix on every unrelated re-render.
+  const writeInstance = useCallback(
+    (mesh: THREE.InstancedMesh, book: BookPlacement, index: number, pulled: boolean) => {
+      const taken = book.shelf === hiddenShelf && book.volume === hiddenVolume;
+      dummy.position.set(book.x, book.y, book.z + (pulled ? PULL_OUT : 0));
+      dummy.scale.set(taken ? 0 : 1, taken ? 0 : book.scaleY, taken ? 0 : 1);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+    },
+    [hiddenShelf, hiddenVolume]
+  );
 
   useLayoutEffect(() => {
     groups.forEach((group, gi) => {
@@ -200,9 +164,9 @@ export default function Bookcase({
     });
     hovered.current = null;
     if (highlightRef.current) highlightRef.current.visible = false;
-  }, [groups]);
+  }, [groups, writeInstance]);
 
-  const clearHover = () => {
+  const clearHover = useCallback(() => {
     const h = hovered.current;
     if (h) {
       const mesh = meshRefs.current[h.group];
@@ -215,7 +179,7 @@ export default function Bookcase({
     if (highlightRef.current) highlightRef.current.visible = false;
     setCanvasCursor(gl.domElement, false);
     callbacks.current.onHoverBook?.(null);
-  };
+  }, [groups, writeInstance, gl]);
 
   const setHover = (gi: number, index: number) => {
     const h = hovered.current;
@@ -241,6 +205,14 @@ export default function Bookcase({
     setCanvasCursor(gl.domElement, true);
     callbacks.current.onHoverBook?.({ wall, shelf: book.shelf, volume: book.volume });
   };
+
+  // Pointer handlers vanish with interactivity (a flight taking over, say), so a volume already pulled
+  // out under the cursor would otherwise stay pulled out until something else rewrites the instances.
+  // Every bookcase of every cell runs this effect; clearing unconditionally would wipe the cursor and the
+  // hover of whichever bookcase actually owns one, so only a bookcase with a live hover of its own clears it.
+  useEffect(() => {
+    if (!interactive && hovered.current) clearHover();
+  }, [interactive, clearHover]);
 
   useEffect(() => {
     return () => {
@@ -279,23 +251,24 @@ export default function Bookcase({
     };
   }, [plaqueMaterials]);
 
-  /* ── Detailed (titled) volumes for the close-up shelf ── */
+  /* ── Detailed (titled) volumes for the close-up shelf; the one taken off it (if any) is left out ── */
   const detailBooks = useMemo(() => {
     if (!detail || !family) return null;
-    const rand = createRandom(seed * 31 + wall * 17 + detail.shelf * 101);
-    return detail.titles.map((title, i) => {
+    const books: { volume: number; tint: number; x: number; y: number; z: number; scaleY: number; spine: THREE.MeshStandardMaterial; gilt: THREE.CanvasTexture }[] = [];
+    detail.titles.forEach((title, i) => {
       const volume = i + 1;
-      const tint = tintOf.get(`${detail.shelf}-${volume}`) ?? 0;
-      const scaleY = 0.97 + rand() * 0.06;
-      const [x, y, z] = bookLocalPosition(detail.shelf, volume, scaleY);
+      if (detail.shelf === hiddenShelf && volume === hiddenVolume) return;
+      // The volume's own placement: the same binding and height as on the other shelves and in flight.
+      const { tint, x, y, z, scaleY } = placements.find((b) => b.shelf === detail.shelf && b.volume === volume)!;
       const gilt = makeTitleGilt(title.trim() || common("volumeN", { n: volume }), family);
       const spine = materials.books[tint].spine.clone();
       spine.emissiveMap = gilt;
       spine.emissiveIntensity = 0.65;
       spine.needsUpdate = true;
-      return { volume, tint, x, y, z, scaleY, spine, gilt };
+      books.push({ volume, tint, x, y, z, scaleY, spine, gilt });
     });
-  }, [detail, family, seed, wall, tintOf, materials, common]);
+    return books;
+  }, [detail, family, placements, materials, common, hiddenShelf, hiddenVolume]);
 
   useEffect(() => {
     return () => {
@@ -464,7 +437,7 @@ function DetailedBook({
 }) {
   const ref = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const target = book.z + (hovered ? PULL_OUT * 1.4 : 0);
+  const target = book.z + (hovered ? TITLED_PULL_OUT : 0);
 
   useEffect(() => {
     if (ref.current) ref.current.position.z = target;

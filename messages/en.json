@@ -142,8 +142,8 @@
     "bannerNext": "You have entered the next gallery. The same shelves, different books.",
     "tooltipBook": "Wall {wall} · Shelf {shelf} · Volume {volume}",
     "tooltipShelf": "Wall {wall} · Shelf {shelf} — open the shelf",
-    "hintDesktop": "W A S D — walk, Shift — run, space — jump, wheel — zoom. Click a volume or a shelf. The spiral staircase in the vestibule leads to the galleries above and below; the far door leads to the next one.",
-    "hintTouch": "Drag a finger to look around; use two fingers to walk. Tap a volume or a shelf.",
+    "hintDesktop": "W A S D — walk, Shift — run, space — jump, wheel — zoom. Click a volume to send it flying to a reading desk, or click a shelf for a closer look. The spiral staircase in the vestibule leads to the galleries above and below; the far door leads to the next one.",
+    "hintTouch": "Drag a finger to look around; use two fingers to walk. Tap a volume to send it flying to a reading desk, or tap a shelf for a closer look.",
     "lockOn": "The mouse steers your gaze · a click opens what is under the crosshair · Esc releases the cursor",
     "lockOff": "Click the scene to steer with the mouse, like in a game · Esc releases the cursor"
   },
@@ -159,8 +159,8 @@
   "Volume": {
     "kicker": "Open volume",
     "tooltipPage": "Page {page} — open",
-    "hint": "The volume has {pages, plural, one {# page} other {# pages}}. Point at a number in the index and click to open that page.",
-    "hintDesktop": " Drag with the mouse to tilt the book; the wheel zooms.",
+    "hint": "The book lies open on the desk at the railing: {pages, plural, one {# page} other {# pages}} inside. Point at a number in the index and click to open that page.",
+    "hintDesktop": " Drag with the mouse to tilt the book, the wheel zooms; a click or Space skips a flight.",
     "randomPage": "✦ random page"
   },
   "Reader": {
@@ -172,7 +172,7 @@
     "spreadPages": "Pages {from}–{to}",
     "kicker": "Open book · wall {wall} · shelf {shelf}",
     "hint": "Click the right page or press → to turn it; click the left page or press ← to go back. Turn quickly and the pages fan out.",
-    "hintDesktop": " Drag or WASD to move over the book, the wheel flies to the spot under the cursor, ↑ ↓ bring it closer or farther, right-drag tilts, Home shows the whole book. L or a click of the wheel takes a loupe: the wheel changes its magnification, Esc puts it away.",
+    "hintDesktop": " Drag or WASD to move over the book, the wheel flies to the spot under the cursor, ↑ ↓ bring it closer or farther, right-drag tilts, Home shows the whole book. L or a click of the wheel takes a loupe: the wheel changes its magnification, Esc puts it away. Turning past the cover into the next or previous volume sends the book flying; a click, Space or Esc skips the flight.",
     "spreadText": "Text of the spread",
     "close": "close ✕",
     "prevTitle": "Previous spread (←)",

@@ -119,7 +119,8 @@ export default function ReaderTextPanel(props: ReaderTextPanelProps) {
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 40, opacity: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(600px, 100%)", zIndex: 8 }}
+      // The HUD layer lets the pointer through to the scene; the panel takes it back.
+      style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(600px, 100%)", zIndex: 8, pointerEvents: "auto" }}
     >
       <Flex direction="column" h="100%" bg="rgba(7,6,10,0.94)" backdropFilter="blur(12px)" borderLeft="1px solid" borderColor="brand.300/25">
         <Box ref={scrollRef} flex="1" minH={0} overflowY="auto" overflowX="hidden" px={{ base: 4, md: 6 }} py={5}>

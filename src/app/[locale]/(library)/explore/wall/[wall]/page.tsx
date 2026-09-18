@@ -2,22 +2,18 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { Box } from "@chakra-ui/react";
 import { useLocalizedPath, useRouter } from "@/i18n/navigation";
-import PageTransition from "@/components/PageTransition";
-import ExploreHud, { ExploreStage, HudSelector } from "@/components/explore/ExploreHud";
-import type { GalleryControlsHandle } from "@/components/explore/GalleryControls";
+import ExploreHud, { HudLayer, HudSelector } from "@/components/explore/ExploreHud";
 import type { BookRef } from "@/components/explore/Bookcase";
 import type { WorldPlace } from "@/components/explore/HexGalleryScene";
 import { DOOR_INDEX, sideYaw } from "@/components/explore/geometry";
 import { mouseCaptureAvailable } from "@/components/explore/cursor";
-import { generateRandomHex, hashString, shortHex } from "@/lib/hex";
+import { useStageHandlers, useStageSelector, useStageStore, useStageView } from "@/components/explore/stage/StageProvider";
+import type { StageView } from "@/components/explore/stage/stageStore";
+import { generateRandomHex, shortHex } from "@/lib/hex";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
-
-const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), { ssr: false });
-const HexGalleryScene = dynamic(() => import("@/components/explore/HexGalleryScene"), { ssr: false });
 
 const WALLS = Array.from({ length: LIBRARY.walls }, (_, i) => i + 1);
 const noSubscribe = () => () => {};
@@ -41,37 +37,50 @@ export default function WallExplorePage() {
 
   if (!hex) {
     return (
-      <PageTransition>
-        <ExploreStage>
-          <ExploreHud kicker={t("kicker")} title={common("wallN", { n: initialWall })} back={{ href: "/", label: explore("backHome") }} />
-        </ExploreStage>
-      </PageTransition>
+      <HudLayer>
+        <ExploreHud kicker={t("kicker")} title={common("wallN", { n: initialWall })} back={{ href: "/", label: explore("backHome") }} />
+      </HudLayer>
     );
   }
-  return <GalleryExplorer key="world" startHex={hex} initialWall={initialWall} />;
+  return <GalleryExplorer key="world" hex={hex} initialWall={initialWall} />;
 }
 
-/** Mounted once per visit: the world grows around the first address and never re-seeds while walking. */
-function GalleryExplorer({ startHex, initialWall }: { startHex: string; initialWall: number }) {
+/**
+ * Mounted once per visit. `hex` follows the visitor (the address is rewritten as they cross into other galleries);
+ * the stage keeps the world it built around the first one.
+ */
+function GalleryExplorer({ hex, initialWall }: { hex: string; initialWall: number }) {
   const t = useTranslations("Gallery");
   const explore = useTranslations("Explore");
   const common = useTranslations("Common");
   const router = useRouter();
   const localizedPath = useLocalizedPath();
-  const [worldHex] = useState(startHex);
-  const worldSeed = useMemo(() => hashString(worldHex), [worldHex]);
-  const controlsRef = useRef<GalleryControlsHandle>(null);
+  const store = useStageStore();
 
-  const [place, setPlace] = useState<WorldPlace>({ level: 0, side: "a", hex: worldHex });
+  const view = useMemo<StageView>(() => ({ kind: "walk", hex, wall: initialWall }), [hex, initialWall]);
+  useStageView(view);
+
+  // Back from a shelf or a book the world is still the one the visitor walked in: they may be floors away from its start.
+  const [place, setPlace] = useState<WorldPlace>(() => {
+    const known = store.getSnapshot().place;
+    return known && known.hex === hex ? known : { level: 0, side: "a", hex };
+  });
   const placeRef = useRef(place);
   const [facingWall, setFacingWall] = useState(initialWall);
   const lastWallRef = useRef(initialWall);
   const [tooltip, setTooltip] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(true);
   const [banner, setBanner] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
-  const [locked, setLocked] = useState(false);
+  const ready = useStageSelector((s) => s.ready);
+  const locked = useStageSelector((s) => s.locked);
+  const moving = useStageSelector((s) => s.moving);
   const lockable = useSyncExternalStore(noSubscribe, mouseCaptureAvailable, () => false);
+  // What was under the pointer when a flight started is not under it when the flight lands.
+  const [flying, setFlying] = useState(moving);
+  if (moving !== flying) {
+    setFlying(moving);
+    if (moving) setTooltip(null);
+  }
 
   // Hide the hint a while after the scene is actually visible.
   useEffect(() => {
@@ -80,24 +89,18 @@ function GalleryExplorer({ startHex, initialWall }: { startHex: string; initialW
     return () => clearTimeout(timer);
   }, [ready, showHint]);
 
-  // Development aid: lets the console move the visitor (window.__gallery.current.teleport(...)).
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    (window as unknown as { __gallery?: unknown }).__gallery = controlsRef;
-  }, []);
-
   // The address of the gallery the visitor is in, read at call time: these callbacks are fired from
   // the render loop, before React has re-rendered with a new place.
   const hexQuery = () => `?hex=${encodeURIComponent(placeRef.current.hex)}`;
 
   const selectWall = useCallback(
     (w: number) => {
-      controlsRef.current?.lookAt(sideYaw(w - 1), -0.04);
+      store.commands.lookAt?.(sideYaw(w - 1), -0.04);
       setFacingWall(w);
       lastWallRef.current = w;
       window.history.replaceState(null, "", localizedPath(`/explore/wall/${w}${hexQuery()}`));
     },
-    [localizedPath]
+    [store, localizedPath]
   );
 
   const onFacingSide = useCallback(
@@ -147,60 +150,45 @@ function GalleryExplorer({ startHex, initialWall }: { startHex: string; initialW
   const onClickShelf = useCallback((wall: number, shelf: number) => router.push(`/explore/wall/${wall}/shelf/${shelf}${hexQuery()}`), [router]);
   const onInteract = useCallback(() => setShowHint(false), []);
 
+  // The mouse being taken is not a page matter: `locked` comes from the stage.
+  useStageHandlers({ onHoverBook, onClickBook, onHoverShelf, onClickShelf, onFacingSide, onPlace, onInteract });
+
   const title = facingWall === 0 ? t("vestibule") : common("wallN", { n: facingWall });
   const kicker = place.level === 0 ? t("kicker") : t("kickerFloor", { floor: `${place.level > 0 ? "+" : ""}${place.level}` });
 
   return (
-    <PageTransition>
-      <ExploreStage>
-        <SceneWrapper seed={worldSeed} onReady={() => setReady(true)}>
-          <HexGalleryScene
-            mode="walk"
-            worldHex={worldHex}
-            wall={initialWall}
-            controlsRef={controlsRef}
-            onHoverBook={onHoverBook}
-            onClickBook={onClickBook}
-            onHoverShelf={onHoverShelf}
-            onClickShelf={onClickShelf}
-            onFacingSide={onFacingSide}
-            onPlace={onPlace}
-            onInteract={onInteract}
-            onLockChange={setLocked}
-          />
-        </SceneWrapper>
-
-        <ExploreHud
-          kicker={kicker}
-          title={title}
-          galleryLabel={shortHex(place.hex)}
-          back={{ href: "/", label: explore("backHome") }}
-          showHint={ready && showHint}
-          hint={
-            <>
-              <Box as="span" display={{ base: "none", md: "inline" }}>
-                {t("hintDesktop")}
-              </Box>
-              <Box as="span" display={{ base: "inline", md: "none" }}>
-                {t("hintTouch")}
-              </Box>
-            </>
-          }
-          lockHint={
-            lockable && ready
-              ? locked
-                ? t("lockOn")
-                : t("lockOff")
-              : null
-          }
-          reticle={locked ? (tooltip ? "active" : "idle") : null}
-          tooltipAnchor={locked ? "center" : "pointer"}
-          tooltip={tooltip}
-          banner={banner}
-        >
-          <HudSelector label={common("wall")} items={WALLS} active={facingWall} onSelect={selectWall} />
-        </ExploreHud>
-      </ExploreStage>
-    </PageTransition>
+    <HudLayer>
+      <ExploreHud
+        kicker={kicker}
+        title={title}
+        galleryLabel={shortHex(place.hex)}
+        back={{ href: "/", label: explore("backHome") }}
+        showHint={ready && showHint}
+        hint={
+          <>
+            <Box as="span" display={{ base: "none", md: "inline" }}>
+              {t("hintDesktop")}
+            </Box>
+            <Box as="span" display={{ base: "inline", md: "none" }}>
+              {t("hintTouch")}
+            </Box>
+          </>
+        }
+        lockHint={
+          lockable && ready
+            ? locked
+              ? t("lockOn")
+              : t("lockOff")
+            : null
+        }
+        // Nothing is aimed at while a flight plays.
+        reticle={locked && !moving ? (tooltip ? "active" : "idle") : null}
+        tooltipAnchor={locked ? "center" : "pointer"}
+        tooltip={moving ? null : tooltip}
+        banner={banner}
+      >
+        <HudSelector label={common("wall")} items={WALLS} active={facingWall} onSelect={selectWall} />
+      </ExploreHud>
+    </HudLayer>
   );
 }

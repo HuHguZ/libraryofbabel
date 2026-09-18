@@ -36,6 +36,22 @@ export const TURN: TurnParams = {
   sheets: 10,
 };
 
+/**
+ * A fast riffle for jumping between the index and a far page: the whole book flies as a bunch and
+ * lands well inside the ~1.2 s the design calls for. Leaves still lift and land at `TURN`'s gentle
+ * `land` speed and `gap` stagger (so the landing itself doesn't feel jerky) but get there quicker
+ * (`speed`, `accel`) and in a fuller fan (`queue` keeps more leaves rippling individually into the
+ * landing instead of vanishing into the bunch; `sheets` is raised to match so that fan is never
+ * capped mid-cascade).
+ */
+export const TURN_RIFFLE: TurnParams = {
+  ...TURN,
+  speed: 5,
+  accel: 15,
+  queue: 7,
+  sheets: 18,
+};
+
 export interface Leaves {
   p: Float32Array;
   v: Float32Array;

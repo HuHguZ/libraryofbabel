@@ -2,21 +2,17 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import { Box } from "@chakra-ui/react";
 import { useRouter } from "@/i18n/navigation";
-import PageTransition from "@/components/PageTransition";
-import ExploreHud, { ExploreStage, HudSelector } from "@/components/explore/ExploreHud";
+import ExploreHud, { HudLayer, HudSelector } from "@/components/explore/ExploreHud";
 import type { BookRef } from "@/components/explore/Bookcase";
-import { generateRandomHex, hashString, shortHex } from "@/lib/hex";
+import { useStageHandlers, useStageSelector, useStageStore, useStageView } from "@/components/explore/stage/StageProvider";
+import type { StageView } from "@/components/explore/stage/stageStore";
+import { generateRandomHex, shortHex } from "@/lib/hex";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
 
-const SceneWrapper = dynamic(() => import("@/components/explore/SceneWrapper"), { ssr: false });
-const HexGalleryScene = dynamic(() => import("@/components/explore/HexGalleryScene"), { ssr: false });
-
 const SHELVES = Array.from({ length: LIBRARY.shelves }, (_, i) => i + 1);
-const EMPTY_TITLES = Array.from({ length: LIBRARY.volumes }, () => "");
 
 export default function ShelfExplorePage() {
   const t = useTranslations("Shelf");
@@ -26,6 +22,7 @@ export default function ShelfExplorePage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const store = useStageStore();
   const wall = clampInt(params.wall, 1, LIBRARY.walls);
   const shelf = clampInt(params.shelf, 1, LIBRARY.shelves);
 
@@ -36,13 +33,16 @@ export default function ShelfExplorePage() {
     if (!hex) router.replace(`/explore/wall/${wall}/shelf/${shelf}?hex=${generateRandomHex()}`, { scroll: false });
   }, [hex, wall, shelf, router]);
 
-  const seed = useMemo(() => hashString(hex), [hex]);
   const hexQuery = hex ? `?hex=${encodeURIComponent(hex)}` : "";
+  const view = useMemo<StageView | null>(() => (hex ? { kind: "shelf", hex, wall, shelf } : null), [hex, wall, shelf]);
+  useStageView(view);
 
-  const [titles, setTitles] = useState<string[]>(EMPTY_TITLES);
+  // The titles and the shelf they were fetched for: another shelf's must never be shown or published as this one's.
+  const [fetched, setFetched] = useState<{ hex: string; wall: number; shelf: number; titles: string[] } | null>(null);
+  const titles = fetched && fetched.hex === hex && fetched.wall === wall && fetched.shelf === shelf ? fetched.titles : null;
   const [tooltip, setTooltip] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(true);
-  const [ready, setReady] = useState(false);
+  const ready = useStageSelector((s) => s.ready);
 
   // Titles of the 31 volumes on this shelf (the gallery address decides them).
   useEffect(() => {
@@ -56,13 +56,19 @@ export default function ShelfExplorePage() {
     })
       .then((r) => r.json())
       .then((data: { titles?: string[] }) => {
-        if (Array.isArray(data.titles) && data.titles.length === LIBRARY.volumes) setTitles(data.titles);
+        if (Array.isArray(data.titles) && data.titles.length === LIBRARY.volumes) setFetched({ hex, wall, shelf, titles: data.titles });
       })
       .catch(() => {
         /* aborted or offline — spines stay blank */
       });
     return () => controller.abort();
   }, [hex, wall, shelf, locale]);
+
+  // The spines on the stage carry the titles. Only real ones are published: the stage already shows blank spines for a
+  // shelf without titles, and may still hold this shelf's from a moment ago (back from a book), which blanks would wipe.
+  useEffect(() => {
+    if (titles) store.setShelfTitles({ hex, wall, shelf, titles });
+  }, [store, hex, wall, shelf, titles]);
 
   // Hide the hint a while after the scene is actually visible.
   useEffect(() => {
@@ -71,7 +77,6 @@ export default function ShelfExplorePage() {
     return () => clearTimeout(timer);
   }, [ready, showHint]);
 
-  const detail = useMemo(() => ({ shelf, titles }), [shelf, titles]);
   const titlesRef = useRef(titles);
   useEffect(() => {
     titlesRef.current = titles;
@@ -83,7 +88,7 @@ export default function ShelfExplorePage() {
         setTooltip(null);
         return;
       }
-      const title = b.wall === wall && b.shelf === shelf ? titlesRef.current[b.volume - 1]?.trim() : "";
+      const title = b.wall === wall && b.shelf === shelf ? titlesRef.current?.[b.volume - 1]?.trim() : "";
       setTooltip(title ? t("tooltipTitled", { volume: b.volume, title }) : t("tooltipVolume", { volume: b.volume }));
     },
     [wall, shelf, t]
@@ -104,43 +109,26 @@ export default function ShelfExplorePage() {
     [router, hexQuery, wall, shelf]
   );
 
-  return (
-    <PageTransition>
-      <ExploreStage>
-        {hex && (
-          <SceneWrapper seed={seed} onReady={() => setReady(true)}>
-            <HexGalleryScene
-              key={`${wall}-${shelf}`}
-              seed={seed}
-              wall={wall}
-              mode="shelf"
-              detail={detail}
-              onHoverBook={onHoverBook}
-              onClickBook={onClickBook}
-              onHoverShelf={onHoverShelf}
-              onClickShelf={onClickShelf}
-              onInteract={() => setShowHint(false)}
-            />
-          </SceneWrapper>
-        )}
+  useStageHandlers({ onHoverBook, onClickBook, onHoverShelf, onClickShelf, onInteract: () => setShowHint(false) });
 
-        <ExploreHud
-          kicker={t("kicker")}
-          title={common("wallShelf", { wall, shelf })}
-          galleryLabel={shortHex(hex)}
-          back={{ href: `/explore/wall/${wall}${hexQuery}`, label: explore("backWall", { n: wall }) }}
-          showHint={ready && showHint}
-          hint={
-            <>
-              {t("hint", { volumes: LIBRARY.volumes })}
-              <Box as="span" display={{ base: "none", md: "inline" }}>{t("hintDesktop")}</Box>
-            </>
-          }
-          tooltip={tooltip}
-        >
-          <HudSelector label={common("shelf")} items={SHELVES} active={shelf} hrefFor={(s) => `/explore/wall/${wall}/shelf/${s}${hexQuery}`} />
-        </ExploreHud>
-      </ExploreStage>
-    </PageTransition>
+  return (
+    <HudLayer>
+      <ExploreHud
+        kicker={t("kicker")}
+        title={common("wallShelf", { wall, shelf })}
+        galleryLabel={shortHex(hex)}
+        back={{ href: `/explore/wall/${wall}${hexQuery}`, label: explore("backWall", { n: wall }) }}
+        showHint={ready && showHint}
+        hint={
+          <>
+            {t("hint", { volumes: LIBRARY.volumes })}
+            <Box as="span" display={{ base: "none", md: "inline" }}>{t("hintDesktop")}</Box>
+          </>
+        }
+        tooltip={tooltip}
+      >
+        <HudSelector label={common("shelf")} items={SHELVES} active={shelf} hrefFor={(s) => `/explore/wall/${wall}/shelf/${s}${hexQuery}`} />
+      </ExploreHud>
+    </HudLayer>
   );
 }

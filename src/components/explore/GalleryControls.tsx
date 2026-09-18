@@ -3,20 +3,44 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, type Ref } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { mouseCaptureAvailable, setCenterAim } from "./cursor";
+import { mouseCaptureAvailable, setCanvasCursor, setCenterAim } from "./cursor";
+
+/** How the controls behave: walking or only looking, whether a click takes the mouse, and the look and zoom limits. */
+export interface GalleryControlsMode {
+  walk: boolean;
+  capture: boolean;
+  /** Absolute yaw limits (radians); omitted for free turning. */
+  yawRange?: [number, number];
+  pitchRange: [number, number];
+  fovRange: [number, number];
+}
 
 export interface GalleryControlsHandle {
   /** Smoothly turn the view to the given yaw (and optional pitch), radians. */
   lookAt(yaw: number, pitch?: number): void;
-  /** Instantly move and orient the camera (position is the eye). */
-  teleport(position: THREE.Vector3Like, yaw: number, pitch?: number): void;
+  /** Instantly move and orient the camera (position is the eye), and set the field of view if given. */
+  teleport(position: THREE.Vector3Like, yaw: number, pitch?: number, fov?: number): void;
   getYaw(): number;
   /** Current eye position (a copy). */
   getPosition(): THREE.Vector3;
+  /** The eye (a copy, without the walking bob), view angles and field of view the controls are showing. */
+  getPose(): { position: THREE.Vector3; yaw: number; pitch: number; fov: number };
   /** True while the mouse leads the view from the screen centre (captured or free-mouse mode). */
   isLocked(): boolean;
   /** Release the mouse (Esc does the same). */
   unlock(): void;
+  /**
+   * Hands the camera to the controls (true) or takes it away (false). Inactive controls ignore all input,
+   * let go of a captured mouse and of held keys, and leave the camera alone for something else to drive;
+   * they still follow the browser's pointer lock, so a lock given back on the way out is noticed.
+   */
+  setActive(active: boolean): void;
+  /**
+   * Switches between walking and looking without re-binding the listeners (which would let go of a captured
+   * mouse). Not taking the mouse lets go of it; not walking forgets held keys. A teleport usually follows,
+   * to put the view inside the new ranges.
+   */
+  configure(mode: GalleryControlsMode): void;
 }
 
 export interface GalleryControlsProps {
@@ -102,7 +126,10 @@ export default function GalleryControls({
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const gl = useThree((s) => s.gl);
   const events = useThree((s) => s.events);
+  const internal = useThree((s) => s.internal);
+  const scene = useThree((s) => s.scene);
 
+  // The eye stays where the `walk` prop put it: a mode configured later only changes what the controls do.
   const eye = walk ? eyeHeight : 0;
   const state = useRef({
     yaw: initialYaw,
@@ -137,73 +164,119 @@ export default function GalleryControls({
     lastCamera: new THREE.Vector3(NaN, NaN, NaN),
     lastYaw: NaN,
     lastPitch: NaN,
+    /** A teleport moved the view from under a hovered object since the last frame. */
+    jumped: false,
   });
 
-  // Keep the latest callbacks and ranges without re-binding listeners: re-binding would release a
-  // captured mouse every time the parent re-renders.
+  // Keep the latest callbacks without re-binding listeners: re-binding would release a captured mouse
+  // every time the parent re-renders.
   const callbacks = useRef({ constrain, onFrame, onInteract, onLockChange });
-  const ranges = useRef({ yawRange, pitchRange, fovRange });
   useLayoutEffect(() => {
     callbacks.current = { constrain, onFrame, onInteract, onLockChange };
-    ranges.current = { yawRange, pitchRange, fovRange };
+  });
+
+  // The mode and the ranges live in a ref that `configure` rewrites. Props write it only when their values
+  // change, so a parent re-rendering with the same props (or React re-running effects) keeps a configured mode.
+  const active = useRef(true);
+  const mode = useRef<GalleryControlsMode>({ walk, capture: walk && pointerLock, yawRange, pitchRange, fovRange });
+  const modeProps = [walk, pointerLock, yawRange?.[0], yawRange?.[1], pitchRange[0], pitchRange[1], fovRange[0], fovRange[1]].join();
+  const appliedModeProps = useRef(modeProps);
+  useLayoutEffect(() => {
+    if (appliedModeProps.current === modeProps) return;
+    appliedModeProps.current = modeProps;
+    mode.current = { walk, capture: walk && pointerLock, yawRange, pitchRange, fovRange };
   });
 
   useImperativeHandle(
     ref,
-    () => ({
-      lookAt(yaw, pitch) {
+    () => {
+      const release = () => {
         const s = state.current;
-        s.targetYaw = s.yaw + wrapAngle(yaw - s.yaw);
-        if (pitch !== undefined) s.targetPitch = pitch;
-      },
-      teleport(position, yaw, pitch) {
-        const s = state.current;
-        s.feet.set(position.x, position.y - eye, position.z);
-        s.from.copy(s.feet);
-        s.smooth.copy(s.feet);
-        s.vy = 0;
-        s.grounded = true;
-        s.yaw = s.targetYaw = yaw;
-        if (pitch !== undefined) s.pitch = s.targetPitch = pitch;
-      },
-      getYaw() {
-        return state.current.yaw;
-      },
-      getPosition() {
-        return camera.position.clone();
-      },
-      isLocked() {
-        return state.current.locked || state.current.free;
-      },
-      unlock() {
         if (typeof document !== "undefined" && document.pointerLockElement) document.exitPointerLock();
-        if (state.current.free) {
-          state.current.free = false;
-          state.current.edgeTurn = 0;
+        if (s.free) {
+          s.free = false;
+          s.edgeTurn = 0;
           setCenterAim(gl.domElement, false);
           callbacks.current.onLockChange?.(false);
         }
-      },
-    }),
-    [eye, camera, gl]
+      };
+      return {
+        lookAt(yaw, pitch) {
+          const s = state.current;
+          s.targetYaw = s.yaw + wrapAngle(yaw - s.yaw);
+          if (pitch !== undefined) s.targetPitch = pitch;
+        },
+        teleport(position, yaw, pitch, fov) {
+          const s = state.current;
+          s.feet.set(position.x, position.y - eye, position.z);
+          s.from.copy(s.feet);
+          s.smooth.copy(s.feet);
+          s.vy = 0;
+          s.grounded = true;
+          s.walkImpulse = 0;
+          s.bobAmount = 0;
+          // Asked now: what is hovered may leave the stage before the next frame.
+          s.jumped = internal.hovered.size > 0;
+          s.yaw = s.targetYaw = yaw;
+          if (pitch !== undefined) s.pitch = s.targetPitch = pitch;
+          if (fov !== undefined) s.fov = s.targetFov = fov;
+        },
+        getYaw() {
+          return state.current.yaw;
+        },
+        getPosition() {
+          return camera.position.clone();
+        },
+        getPose() {
+          const s = state.current;
+          return { position: new THREE.Vector3(s.smooth.x, s.smooth.y + eye, s.smooth.z), yaw: s.yaw, pitch: s.pitch, fov: s.fov };
+        },
+        isLocked() {
+          return state.current.locked || state.current.free;
+        },
+        unlock: release,
+        setActive(on) {
+          active.current = on;
+          if (on) return;
+          release();
+          const s = state.current;
+          s.keys.clear();
+          s.pointers.clear();
+          s.walkImpulse = 0;
+        },
+        configure(next) {
+          mode.current = { ...next };
+          const s = state.current;
+          if (!next.capture) release();
+          if (!next.walk) {
+            s.keys.clear();
+            s.walkImpulse = 0;
+          }
+        },
+      };
+    },
+    [eye, camera, gl, internal]
   );
 
-  // Initial camera placement.
+  // Initial camera placement, unless the controls were made inactive as they mounted: the camera is someone else's then.
   useEffect(() => {
     const s = state.current;
     camera.rotation.order = "YXZ";
-    camera.position.set(s.smooth.x, s.smooth.y + eye, s.smooth.z);
-    camera.rotation.set(s.pitch, s.yaw, 0);
-    camera.fov = s.fov;
-    camera.near = 0.05;
     camera.far = 80;
+    if (active.current) {
+      camera.position.set(s.smooth.x, s.smooth.y + eye, s.smooth.z);
+      camera.rotation.set(s.pitch, s.yaw, 0);
+      camera.fov = s.fov;
+      camera.near = 0.05;
+    }
     camera.updateProjectionMatrix();
   }, [camera, eye]);
 
+  // `walk` and `pointerLock` stay in the dependencies although the listeners read the mode ref: new props
+  // re-bind the listeners and so let go of a captured mouse; `configure` changes the mode without that.
   useEffect(() => {
     const el = gl.domElement;
     const s = state.current;
-    const capturable = walk && pointerLock && mouseCaptureAvailable();
     const markInteraction = () => {
       if (!s.interacted) {
         s.interacted = true;
@@ -211,7 +284,7 @@ export default function GalleryControls({
       }
     };
     const turn = (dx: number, dy: number, sens: number) => {
-      const { yawRange: yr, pitchRange: pr } = ranges.current;
+      const { yawRange: yr, pitchRange: pr } = mode.current;
       s.targetYaw += dx * sens;
       s.targetPitch = THREE.MathUtils.clamp(s.targetPitch + dy * sens, pr[0], pr[1]);
       if (yr) s.targetYaw = THREE.MathUtils.clamp(s.targetYaw, yr[0], yr[1]);
@@ -242,7 +315,8 @@ export default function GalleryControls({
       // that never worked is not going to: fall back to the free mouse.
       if (pointerLockWorked) return;
       pointerLockRefused = true;
-      enterFree();
+      // The refusal may arrive after the controls stopped taking the mouse.
+      if (active.current && mode.current.capture) enterFree();
     };
     const takeMouse = () => {
       if (pointerLockRefused || typeof el.requestPointerLock !== "function") {
@@ -258,6 +332,7 @@ export default function GalleryControls({
     };
 
     const onPointerDown = (e: PointerEvent) => {
+      if (!active.current) return;
       s.lastPointerType = e.pointerType;
       if (s.locked || s.free) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -274,6 +349,7 @@ export default function GalleryControls({
       }
     };
     const onPointerMove = (e: PointerEvent) => {
+      if (!active.current) return;
       if (s.locked) {
         // Captured mouse: raw movement, shooter semantics (mouse right = look right).
         const dx = THREE.MathUtils.clamp(e.movementX, -120, 120);
@@ -317,18 +393,20 @@ export default function GalleryControls({
         cy /= s.pointers.size;
         const delta = cy - s.lastCentroidY;
         s.lastCentroidY = cy;
-        if (walk) s.walkImpulse -= delta * 0.012;
+        if (mode.current.walk) s.walkImpulse -= delta * 0.012;
         return;
       }
       // "Grab the world": dragging right turns the view left, as in street-level panoramas.
       turn(dx, dy, e.pointerType === "touch" ? 0.0042 : 0.0028);
     };
     const onPointerLeave = () => {
+      if (!active.current) return;
       s.freeX = NaN;
       s.freeY = NaN;
       s.edgeTurn = 0;
     };
     const onPointerUp = (e: PointerEvent) => {
+      if (!active.current) return;
       s.pointers.delete(e.pointerId);
       try {
         el.releasePointerCapture(e.pointerId);
@@ -337,7 +415,8 @@ export default function GalleryControls({
       }
     };
     const onClickCapture = (e: MouseEvent) => {
-      if (!capturable || s.locked || s.free || s.lastPointerType !== "mouse") return;
+      if (!active.current || !mode.current.capture || !mouseCaptureAvailable()) return;
+      if (s.locked || s.free || s.lastPointerType !== "mouse") return;
       // The first click only takes the mouse; the scene must not treat it as a click on a book.
       e.stopImmediatePropagation();
       markInteraction();
@@ -346,6 +425,11 @@ export default function GalleryControls({
     const onLockChange = () => {
       const locked = document.pointerLockElement === el;
       if (locked === s.locked) return;
+      if (locked && (!active.current || !mode.current.capture)) {
+        // Granted after the controls stopped taking the mouse: give it straight back.
+        document.exitPointerLock();
+        return;
+      }
       if (locked) {
         pointerLockWorked = true;
         if (s.free) {
@@ -361,17 +445,19 @@ export default function GalleryControls({
     };
     const onLockError = () => lockRefused();
     const onWheel = (e: WheelEvent) => {
+      if (!active.current) return;
       e.preventDefault();
       markInteraction();
-      const fr = ranges.current.fovRange;
+      const fr = mode.current.fovRange;
       s.targetFov = THREE.MathUtils.clamp(s.targetFov + e.deltaY * 0.02, fr[0], fr[1]);
     };
     const onKeyDown = (e: KeyboardEvent) => {
+      if (!active.current) return;
       if ((e.code === "Escape" || e.key === "Escape") && s.free) {
         exitFree();
         return;
       }
-      if (!walk || isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!mode.current.walk || isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       if (!MOVE_KEYS.includes(e.code)) return;
       e.preventDefault();
       if (e.repeat) return;
@@ -382,8 +468,12 @@ export default function GalleryControls({
         s.vy = JUMP_SPEED;
       }
     };
-    const onKeyUp = (e: KeyboardEvent) => s.keys.delete(e.code);
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (!active.current) return;
+      s.keys.delete(e.code);
+    };
     const onBlur = () => {
+      if (!active.current) return;
       s.keys.clear();
       exitFree();
     };
@@ -427,30 +517,33 @@ export default function GalleryControls({
   const move = useRef(new THREE.Vector3());
 
   useFrame((_, dt) => {
+    // Inactive: the camera belongs to someone else.
+    if (!active.current) return;
     const s = state.current;
+    const m = mode.current;
     const step = Math.min(dt, 0.05);
     let running = false;
 
-    if (walk) {
+    if (m.walk) {
       const k = s.keys;
       running = k.has("ShiftLeft") || k.has("ShiftRight");
       const f = forward.current.set(-Math.sin(s.yaw), 0, -Math.cos(s.yaw));
       const r = right.current.set(Math.cos(s.yaw), 0, -Math.sin(s.yaw));
-      const m = move.current.set(0, 0, 0);
-      if (k.has("KeyW") || k.has("ArrowUp")) m.add(f);
-      if (k.has("KeyS") || k.has("ArrowDown")) m.sub(f);
-      if (k.has("KeyD") || k.has("ArrowRight")) m.add(r);
-      if (k.has("KeyA") || k.has("ArrowLeft")) m.sub(r);
-      if (m.lengthSq() > 0) m.normalize().multiplyScalar(speed * (running ? RUN_FACTOR : 1) * step);
+      const mv = move.current.set(0, 0, 0);
+      if (k.has("KeyW") || k.has("ArrowUp")) mv.add(f);
+      if (k.has("KeyS") || k.has("ArrowDown")) mv.sub(f);
+      if (k.has("KeyD") || k.has("ArrowRight")) mv.add(r);
+      if (k.has("KeyA") || k.has("ArrowLeft")) mv.sub(r);
+      if (mv.lengthSq() > 0) mv.normalize().multiplyScalar(speed * (running ? RUN_FACTOR : 1) * step);
       if (Math.abs(s.walkImpulse) > 1e-4) {
-        m.addScaledVector(f, s.walkImpulse);
+        mv.addScaledVector(f, s.walkImpulse);
         s.walkImpulse *= 0.6;
       }
-      const moving = m.lengthSq() > 0;
+      const moving = mv.lengthSq() > 0;
       if (moving || !s.grounded) {
         s.from.copy(s.feet);
-        s.feet.x += m.x;
-        s.feet.z += m.z;
+        s.feet.x += mv.x;
+        s.feet.z += mv.z;
         if (!s.grounded) {
           s.vy -= GRAVITY * step;
           s.feet.y += s.vy * step;
@@ -470,12 +563,15 @@ export default function GalleryControls({
         }
       }
       s.moving = moving && s.grounded;
+    } else {
+      // Walking switched off mid-stride: the head bob must settle, not keep swinging.
+      s.moving = false;
     }
 
     // Free mouse parked near a side of the canvas: keep turning that way.
     if (s.free && s.edgeTurn !== 0) {
       const t = s.edgeTurn;
-      const yr = ranges.current.yawRange;
+      const yr = m.yawRange;
       s.targetYaw -= Math.sign(t) * t * t * EDGE_TURN_RATE * step;
       if (yr) s.targetYaw = THREE.MathUtils.clamp(s.targetYaw, yr[0], yr[1]);
     }
@@ -487,7 +583,7 @@ export default function GalleryControls({
     s.smooth.x = THREE.MathUtils.damp(s.smooth.x, s.feet.x, 8, step);
     s.smooth.z = THREE.MathUtils.damp(s.smooth.z, s.feet.z, 8, step);
     // Steps are smoothed out; a jump follows the feet exactly.
-    s.smooth.y = walk && !s.grounded ? s.feet.y : THREE.MathUtils.damp(s.smooth.y, s.feet.y, 10, step);
+    s.smooth.y = m.walk && !s.grounded ? s.feet.y : THREE.MathUtils.damp(s.smooth.y, s.feet.y, 10, step);
 
     // A little head bob while walking.
     s.bobAmount = THREE.MathUtils.damp(s.bobAmount, s.moving ? 1 : 0, 8, step);
@@ -501,11 +597,23 @@ export default function GalleryControls({
       camera.updateProjectionMatrix();
     }
 
-    // With the mouse taken, the cursor is the screen centre: refresh hover when the view changes.
-    if (aimed) {
+    // With the mouse taken, the cursor is the screen centre: refresh hover when the view changes. A teleport
+    // moves the view under a still cursor: whatever it hovered is refreshed too (a cursor that has left the
+    // canvas has nothing hovered, so no stale position is ever used).
+    const jumped = s.jumped;
+    s.jumped = false;
+    if (aimed || jumped) {
       const changed =
         s.lastCamera.distanceToSquared(camera.position) > 1e-7 || Math.abs(s.lastYaw - s.yaw) > 1e-5 || Math.abs(s.lastPitch - s.pitch) > 1e-5;
-      if (changed || Number.isNaN(s.lastYaw)) events.update?.();
+      if (changed || jumped || Number.isNaN(s.lastYaw)) {
+        // The raycaster reads world matrices, which the renderer only updates after this frame: the camera's,
+        // and after a jump the whole scene's too, since the view may land on objects that have only just mounted.
+        if (jumped) scene.updateMatrixWorld();
+        camera.updateMatrixWorld();
+        events.update?.();
+        // Objects that left the stage while hovered never get a pointer-out: with nothing hovered, no pointer cursor.
+        if (jumped && internal.hovered.size === 0) setCanvasCursor(gl.domElement, false);
+      }
     }
     s.lastCamera.copy(camera.position);
     s.lastYaw = s.yaw;

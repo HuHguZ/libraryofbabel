@@ -24,6 +24,24 @@ export function ExploreStage({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * A page's HUD over the stage: it covers the stage without taking the pointer from the scene (the HUD's own controls
+ * take it back), stays above the loading veil, and fades in with the page. Opacity only: a transformed ancestor would
+ * become the containing block of the fixed pointer tooltip.
+ */
+export function HudLayer({ children }: { children: ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      style={{ position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 const mono = "var(--font-jetbrains), monospace";
 const serif = "var(--font-cormorant), Georgia, serif";
 

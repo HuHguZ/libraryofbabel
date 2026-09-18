@@ -29,7 +29,10 @@ export function createCanvas(width: number, height: number): [HTMLCanvasElement,
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d");
+  // Every canvas here is drawn once and then handed to the GPU as a texture, which reads all of it back.
+  // Kept in main memory it is copied straight up; drawn on the graphics card it has to be fetched back first,
+  // and for a page of text that fetch holds up the frames (~17 ms for a page at 1200 × 1700).
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("2D canvas is not available");
   return [canvas, ctx];
 }

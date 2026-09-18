@@ -5,7 +5,10 @@ import { useTexture } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { createRandom } from "@/lib/hex";
+import { TINT_GROUPS } from "./bookcasePlan";
 import { canvasTexture, createCanvas } from "./textTexture";
+
+export { TINT_GROUPS };
 
 export const GOLD = "#c9a84c";
 export const GOLD_LIGHT = "#f0d890";
@@ -28,8 +31,6 @@ export const PALETTE = [
   "#6e3b1e", "#2c4a5e", "#7b5c2e", "#3c2f45",
 ];
 
-export const TINT_GROUPS = 8;
-
 export interface GalleryPlan {
   floor: string;
   wall: string;
@@ -38,7 +39,6 @@ export interface GalleryPlan {
   leathers: [string, string, string];
   parchment: string;
   tints: string[];
-  lampIntensity: number;
 }
 
 const textureUrl = (name: string) => `/textures/${name}.webp`;
@@ -58,7 +58,6 @@ export function planGallery(seed: number): GalleryPlan {
       leathers: [VARIANTS.leather[0], VARIANTS.leather[1], VARIANTS.leather[2]],
       parchment: VARIANTS.parchment[0],
       tints: PALETTE.slice(0, TINT_GROUPS),
-      lampIntensity: 13,
     };
   }
   const rand = createRandom(seed);
@@ -82,7 +81,6 @@ export function planGallery(seed: number): GalleryPlan {
     leathers,
     parchment: pick(rand, VARIANTS.parchment),
     tints,
-    lampIntensity: 11 + rand() * 5,
   };
 }
 
@@ -228,6 +226,20 @@ const SURFACE_TINT: Record<string, string> = {
   wood_mahogany: "#c9b8a4",
 };
 
+/**
+ * The gold glow over what the pointer is on. One factory for every copy: the book's warm-up keeps this program compiled
+ * (see DeskBookWarmUp), which only works while its material is made exactly like the gallery's.
+ */
+export function makeHighlightMaterial(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color: new THREE.Color(GOLD_LIGHT),
+    transparent: true,
+    opacity: 0.28,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+}
+
 export function LibraryMaterialsProvider({ seed = 0, children }: { seed?: number; children: ReactNode }) {
   const gl = useThree((s) => s.gl);
   const plan = useMemo(() => planGallery(seed), [seed]);
@@ -345,13 +357,7 @@ export function LibraryMaterialsProvider({ seed = 0, children }: { seed?: number
         roughness: 0.3,
       }),
       books,
-      highlight: new THREE.MeshBasicMaterial({
-        color: new THREE.Color(GOLD_LIGHT),
-        transparent: true,
-        opacity: 0.28,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      }),
+      highlight: makeHighlightMaterial(),
     };
   }, [raw, gl, plan]);
 
