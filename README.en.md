@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/en/doorway.jpg" alt="A hexagonal gallery: through the doorway, the spiral staircase of the vestibule and the shelves of the next gallery" width="100%" />
+  <img src="docs/screenshots/en/doorway.jpg" alt="A hexagonal gallery: reading desks stand at the railing, and through the doorway the spiral staircase of the vestibule and the shelves of the next gallery" width="100%" />
 </p>
 
 ---
@@ -39,6 +39,8 @@ The Library speaks **two languages**. The `RU | EN` switch in the header changes
 
 The galleries never end. Beyond the door is a vestibule with a spiral staircase, beyond that the next gallery, and above and below there are more galleries still. Everything nearby is already loaded and drawn, so crossing from one gallery into the next gives nothing away: the world simply goes on.
 
+At the shaft railing, opposite each of the five walls of shelves, stands a reading desk with a brass lamp &mdash; a volume taken from that wall comes to rest on it.
+
 <p align="center">
   <img src="docs/screenshots/walk.webp" alt="Walking out of a gallery, through the door, past the spiral staircase and into the next gallery" width="100%" />
 </p>
@@ -46,12 +48,12 @@ The galleries never end. Beyond the door is a vestibule with a spiral staircase,
 <table>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/en/gallery.jpg" alt="Five walls of bookshelves around the ventilation shaft" />
-      <br><sub><b>A hexagonal gallery.</b> Five walls of shelves, a lamp and the railing around the shaft.</sub>
+      <img src="docs/screenshots/en/gallery.jpg" alt="Five walls of bookshelves around the ventilation shaft, reading desks with lamps at the railing" />
+      <br><sub><b>A hexagonal gallery.</b> Five walls of shelves, a lamp overhead and reading desks at the railing of the shaft.</sub>
     </td>
     <td width="50%">
       <img src="docs/screenshots/en/aim.jpg" alt="The crosshair in the centre of the screen rests on a volume; a tooltip names its wall, shelf and number" />
-      <br><sub><b>Like a shooter.</b> The mouse steers your gaze, the crosshair pulls a volume out, a click opens it.</sub>
+      <br><sub><b>Like a shooter.</b> The mouse steers your gaze, the crosshair pulls a volume out, a click sends it to a desk.</sub>
     </td>
   </tr>
   <tr>
@@ -60,13 +62,19 @@ The galleries never end. Beyond the door is a vestibule with a spiral staircase,
       <br><sub><b>The vestibule.</b> The spiral staircase leads to the floors above and below, the door to the next gallery.</sub>
     </td>
     <td width="50%">
-      <img src="docs/screenshots/en/shaft.jpg" alt="Looking down over the railing into the shaft at the shelves of the gallery below" />
-      <br><sub><b>The shaft.</b> Past the railing you can see the gallery below &mdash; and the one below that.</sub>
+      <img src="docs/screenshots/en/shaft.jpg" alt="Looking down over the railing into the shaft, reading desks around the railing, the shelves of the gallery below" />
+      <br><sub><b>The shaft.</b> The desks stand in a ring at the railing, and past it you can see the gallery below &mdash; and the one below that.</sub>
     </td>
   </tr>
 </table>
 
 ## Books
+
+Click a volume and it slides off the shelf, flies across the gallery and settles onto the desk at the railing, opening to its title page and index. The back link &mdash; in the header, or the browser's own &mdash; closes the book and sends it home to its gap on the shelf, and your view returns to right where you stood. A flight can be skipped with a click, Space, Enter or Esc, and reversed just as easily if you change your mind partway through.
+
+<p align="center">
+  <img src="docs/screenshots/take.webp" alt="A volume slips off the shelf, flies across the gallery, settles on the desk and opens; go back, and it closes and returns to its place" width="100%" />
+</p>
 
 Every shelf holds 31 volumes with a title on the spine; every volume has 421 pages. An open book reads like a real one: turn the pages, lean over a page and run your eye along the lines, search the spread for a phrase. Turn quickly and the pages fan out, several in the air at once, and no two leaves turn alike.
 
@@ -100,14 +108,14 @@ For a closer look there is a loupe: the &ldquo;loupe&rdquo; button, the `L` key 
       <br><sub><b>A shelf up close.</b> The open shelf is lit, and every volume has a title of its own.</sub>
     </td>
     <td width="50%">
-      <img src="docs/screenshots/en/volume.jpg" alt="An open volume on the table: the title page and the index of pages" />
-      <br><sub><b>An open volume.</b> The title page and an index of all 421 pages.</sub>
+      <img src="docs/screenshots/en/volume.jpg" alt="An open volume on the desk at the railing: the title page and the index of pages, the gallery around it" />
+      <br><sub><b>An open volume.</b> The title page and an index of all 421 pages, on the desk at the railing.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/en/reader.jpg" alt="A spread of text under a desk lamp" />
-      <br><sub><b>The reading table.</b> A spread under the desk lamp, with a red ribbon.</sub>
+      <img src="docs/screenshots/en/reader.jpg" alt="A spread of text under a desk lamp, the railing and the shelves of the gallery behind the desk" />
+      <br><sub><b>The reading desk.</b> A spread under the desk lamp, with a red ribbon, and the same gallery all around.</sub>
     </td>
     <td width="50%">
       <img src="docs/screenshots/en/reader-search.jpg" alt="The phrase “the library of babel” highlighted among random characters" />
@@ -166,7 +174,7 @@ The same address holds different text in the two Libraries, so the language is p
 
 **Random page** &mdash; let the Library pick a page out of infinity for you.
 
-**3D walk** &mdash; an endless first-person world of galleries, shelves with titled spines, open volumes and a reader with page turning.
+**3D walk** &mdash; an endless first-person world of galleries: shelves with titled spines, a volume that flies to a desk and opens there, and a reader with page turning &mdash; all without a single change of scene.
 
 **Copy and share a fragment** &mdash; the &ldquo;text & address&rdquo; panel beside the open book shows the text of the spread: copy a whole page with one button, or select a few lines and copy a link to them. The link opens the same spread with the panel already open and the fragment marked, both in the text and on the page of the 3D book, and the camera glides over to it. While you select, the book marks the same characters. The mark can take any colour: the swatch next to &ldquo;fragment&rdquo; opens a colour picker with ready-made colours, and your choice is remembered in the browser.
 
@@ -186,6 +194,7 @@ The Library is not a safe: a page's address is its text, written reversibly by a
 | | open a shelf or a volume | click whatever is under the crosshair |
 | Shelf | open a volume | click its spine |
 | Volume | open a page | click its number in the index |
+| Gallery, shelf, volume, reader | skip a flight | click the scene, space, `Enter` or `Esc` |
 | Reader | turn pages | `←` `→`, `PageUp` `PageDown` or click a page |
 | | move over the book | drag with the mouse or `W A S D` (`Shift` to hurry) |
 | | fly to a spot on the page | mouse wheel towards the cursor, `↑` `↓` closer and farther |
@@ -221,6 +230,7 @@ npm test                     # tests (Vitest)
 ## Under the hood
 
 - **An endless world.** Two galleries share one vestibule, the pairs repeat floor after floor, and the spiral staircase makes one full turn per floor. The neighbouring galleries (through the door, above and below) stay in the scene with their own materials, while distant floors are lightweight copies. The number of lights never changes, so no shader is recompiled as you walk on.
+- **One scene for all of it.** The gallery, the shelf up close, the open volume and the reader are not four pages but four states of one scene: the canvas lives in a shared route layout, and a director plays the flights between the states along timelines computed in advance (`src/components/explore/stage`). That is why the book really does fly from the shelf to the desk instead of being replaced by another screen &mdash; and every state is still a plain link you can open directly, while going back mid-flight turns the flight around from wherever it had got to.
 - **Determinism.** The addresses of neighbouring galleries are derived from the starting one, so the way back leads to the same books. A gallery's look &mdash; floor, walls, ceiling, shelf wood, leather and binding colours &mdash; is picked from its address too.
 - **A reversible algorithm.** Every character of a page is shifted by a pseudo-random keystream seeded from the wall, shelf, volume and page, and the shifted characters are written as address "digits" in blocks: 4 characters of the Russian Library as 5 digits, 7 characters of the English one as 8. A block is read as one number, so a page address takes at most 6,024 characters, only 1% over the theoretical minimum for 62 digits. Search writes a text into an address, reading brings it back (`src/lib/babel.ts`; the packing is in `src/lib/library.ts`, the alphabets in `src/lib/alphabet.ts`).
 - **Long links.** An address plus the search phrase `q` can run to tens of kilobytes, and Node rejects requests with headers over 16 KB by default (error 431). `.npmrc` raises that limit for `npm run dev` and `npm start`.
@@ -230,6 +240,7 @@ npm test                     # tests (Vitest)
 - **The reader** draws pages onto canvas textures ahead of time, a few spreads either way, and uploads them to the GPU at once, so a turning leaf already has text on its back. Every leaf moves on its own (`src/components/explore/leaves.ts`): the next one lifts once the one before is a little ahead, and a long queue is flipped as a bunch. The bend is computed in the vertices of the geometry as a spring, and every turn draws a character of its own (speed, stiffness, which corner leads, the ripple along the edge).
 - **The loupe** (`src/components/explore/loupe`) does not stretch the finished frame; it draws the scene once more: the same camera, its view cropped (`setViewOffset`) to a square N times smaller than the lens, and that picture is laid over the glass. So the letters under the loupe stay sharp for as long as the page texture has the resolution. The glass shader squeezes the picture towards the rim, parts the colours a little by the frame and adds highlights. The loupe fits any 3D scene: `<Loupe active />` inside the `Canvas` and the `useLoupe()` hook on the page. The model is [Magnifying Glass 01](https://polyhaven.com/a/magnifying_glass_01) by Nazar Borodavka, Poly Haven (CC0).
 - **Links to fragments** look like `/page/<address>?text=12:160-240`: the page, then character offsets into its 4,819-character text (the end exclusive), next to the search phrase `q` if there is one. A selection in the panel is turned into these offsets by measuring the text from the start of the page up to each end of the selection, so search highlights splitting the text into pieces do not get in the way (`src/lib/fragment.ts`).
+- **Debug hooks.** In development, `window.__reader` lets you inspect the book's leaves, its page-texture cache and the view, and slow page turns down; `window.__stage` adds `setTimeScale(scale)` to slow or freeze a flight; `seek(fraction)` to jump to a given fraction of it, from 0 to 1; `skip()` to finish it at once; `state()` for the stage's controller and, while a flight plays, its kind and how many seconds through it is; `hide(wall, shelf, volume)` to make one volume vanish from its shelf as if it had been taken; and `lightDesk(wall)` to light that wall's desk lamp by hand, even with no book on it (`null` turns it off).
 
 ## Stack
 
