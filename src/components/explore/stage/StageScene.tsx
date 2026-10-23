@@ -6,6 +6,9 @@ import Loupe from "../loupe/Loupe";
 import Director from "./Director";
 import { useStageSelector, useStageStore } from "./StageProvider";
 import type { StageHandlers, StageStore } from "./stageStore";
+import PresenceReporter from "@/components/online/PresenceReporter";
+import RemotePlayers from "@/components/online/RemotePlayers";
+import NoteMarks from "@/components/online/NoteMarks";
 
 /** Every callback a scene can fire, each one fixed for the life of the store. */
 type SceneCallbacks = Required<StageHandlers>;
@@ -62,6 +65,9 @@ export default function StageScene() {
   return (
     <>
       <Director controlsRef={controlsRef} on={on} onReading={setReading} />
+      <PresenceReporter />
+      <RemotePlayers />
+      <NoteMarks />
       <Loupe active={loupe && reading} />
     </>
   );

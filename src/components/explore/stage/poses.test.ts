@@ -11,8 +11,11 @@ describe("nearestYaw", () => {
     expect(nearestYaw(0.2, 0.5, [0, 1])).toEqual({ yaw: 0.5, range: [0, 1] });
   });
 
-  it("brings a close-up in gallery B a turn back to a camera that never turned round", () => {
-    const { pose, yawRange } = closeupPose(0, "b", 4, 3);
+  it("brings a close-up a full turn back to a camera that never turned round", () => {
+    const { pose, yawRange } = closeupPose(0, -3, 4, 3);
+    pose.yaw += TURN;
+    yawRange[0] += TURN;
+    yawRange[1] += TURN;
     expect(pose.yaw).toBeGreaterThan(Math.PI);
     const { yaw, range } = nearestYaw(-2, pose.yaw, yawRange);
     expect(yaw).toBeCloseTo(pose.yaw - TURN, 12);
@@ -40,7 +43,7 @@ describe("nearestYaw", () => {
 
   it("never lets the controls' clamp swing the view a turn round", () => {
     // What GalleryControls does with a small mouse turn once the range is set and the camera placed.
-    const { pose, yawRange } = closeupPose(2, "b", 5, 6);
+    const { pose, yawRange } = closeupPose(2, -3, 4, 6);
     for (const current of [-7.5, -1, 0, 3.2, 9.9]) {
       const { yaw, range } = nearestYaw(current, pose.yaw, yawRange);
       const turned = THREE.MathUtils.clamp(yaw + 0.01, range![0], range![1]);

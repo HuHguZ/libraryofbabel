@@ -35,8 +35,8 @@ describe("createStageStore", () => {
     const store = createStageStore();
     const listener = vi.fn();
     store.subscribe(listener);
-    store.patch({ place: { level: 1, side: "b", hex: "x" }, origin: { kind: "shelf", wall: 2, shelf: 5 } });
-    store.patch({ place: { level: 1, side: "b", hex: "x" }, origin: { kind: "shelf", wall: 2, shelf: 5 } });
+    store.patch({ place: { level: 1, col: 2, hex: "x", cell: { x: 0n, floor: 0n } }, origin: { kind: "shelf", wall: 2, shelf: 5 } });
+    store.patch({ place: { level: 1, col: 2, hex: "x", cell: { x: 0n, floor: 0n } }, origin: { kind: "shelf", wall: 2, shelf: 5 } });
     expect(listener).toHaveBeenCalledTimes(1);
   });
 

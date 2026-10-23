@@ -35,18 +35,3 @@ export function shortHex(hex: string): string {
   if (!hex) return "…";
   return `${hex.slice(0, 4)}·${hex.slice(4, 8)}…`;
 }
-
-/**
- * Address of the gallery at (level, side) of the world that starts from `worldHex`
- * (the starting gallery itself is level 0, side "a"). Deterministic, so walking back
- * returns to the same books.
- */
-export function cellHex(worldHex: string, level: number, side: "a" | "b"): string {
-  if (level === 0 && side === "a") return worldHex;
-  const rand = createRandom(hashString(`${worldHex}#${level}#${side}`));
-  let hex = "";
-  for (let i = 0; i < MAX_ADDRESS_LENGTH; i++) {
-    hex += DIGS[Math.floor(rand() * DIGS.length)];
-  }
-  return hex;
-}

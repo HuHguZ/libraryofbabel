@@ -44,6 +44,8 @@ export interface ReaderTextPanelProps {
   matchScrollToken: number;
   onSelection: (selected: TextFragment | null) => void;
   onShare: () => void;
+  /** Leave a note on the marked fragment; absent while offline. */
+  onNote?: () => void;
   onShow: () => void;
   onClear: () => void;
   onClose: () => void;
@@ -185,11 +187,12 @@ export default function ReaderTextPanel(props: ReaderTextPanelProps) {
                     </Text>
                   )}
                 </Box>
-                <Flex gap={2} flexShrink={0} ml="auto">
+                <Flex gap={2} flexShrink={0} flexWrap="wrap" maxW="100%" ml="auto">
                   <HudButton onClick={onShow} title={t("showFragmentTitle")}>
                     {t("showFragment")}
                   </HudButton>
                   <HudCopyButton key={shareUrl} value={shareUrl} label={t("shareFragment")} copiedLabel={t("linkCopied")} title={t("shareFragmentTitle")} onCopy={onShare} />
+                  {props.onNote && <HudButton onClick={props.onNote} title={t("leaveNoteTitle")}>{t("leaveNote")}</HudButton>}
                   <HudButton onClick={onClear} title={t("clearFragment")}>
                     ✕
                   </HudButton>

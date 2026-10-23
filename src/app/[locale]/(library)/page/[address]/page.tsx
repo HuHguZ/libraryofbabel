@@ -17,6 +17,10 @@ import { shortHex } from "@/lib/hex";
 import { spreadMatches, stepMatch } from "@/lib/matches";
 import { useFragmentColor } from "@/lib/fragmentColor";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
+import { cellOf } from "@/lib/world";
+import type { Anchor } from "@/lib/online/protocol";
+import { useOnlineSelector } from "@/components/online/OnlineProvider";
+import NoteComposer from "@/components/online/NoteComposer";
 
 const mono = "var(--font-jetbrains), monospace";
 const serif = "var(--font-cormorant), Georgia, serif";
@@ -123,6 +127,9 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   // The marked fragment, and the part of the text being selected right now (it replaces the mark once the selection ends).
   const [fragments, dispatchFragment] = useReducer(fragmentReducer, { mark: initialFragment, live: null });
   const [fragmentColor] = useFragmentColor();
+  const online = useOnlineSelector((s) => s.status === "online");
+  const [noting, setNoting] = useState<Anchor | null>(null);
+  const cell = useMemo(() => cellOf(address.hex), [address.hex]);
   // Each request to show the fragment (the link opening, "show"): the panel scrolls to it and the camera glides to it.
   const [fragmentFocus, setFragmentFocus] = useState(() => {
     const here = initialFragment !== null && Math.floor(initialFragment.page / 2) === Math.floor(address.page / 2);
@@ -324,7 +331,7 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   useStageHandlers({ onHoverTurn: onHoverPage, onTurn: go, onInteract: () => setShowHint(false) });
 
   return (
-    <HudLayer>
+    <HudLayer zIndex={textOpen || noting ? 8 : 4}>
       <ExploreHud
         kicker={t("kicker", { wall: address.wall, shelf: address.shelf })}
         title={shownTitle}
@@ -341,6 +348,7 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
         tooltip={loupe.active ? null : tooltip}
         rightPanel={textOpen ? "min(600px, 100%)" : null}
         extra={
+          <>
           <AnimatePresence>
             {textOpen && (
               <ReaderTextPanel
@@ -362,12 +370,22 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
                 matchScrollToken={matchCursor.key === matchKey ? matchCursor.step : 0}
                 onSelection={onSelection}
                 onShare={settleSelection}
+                onNote={online && marked ? () => {
+                  settleSelection();
+                  setNoting({ wall: address.wall, shelf: address.shelf, volume: address.volume, ...marked });
+                } : undefined}
                 onShow={showFragment}
                 onClear={clearFragment}
                 onClose={() => setTextOpen(false)}
               />
             )}
           </AnimatePresence>
+          {online && noting && (
+            <Box position="absolute" bottom="100px" left="50%" transform="translateX(-50%)" zIndex={9} pointerEvents="auto">
+              <NoteComposer cell={cell} anchor={noting} onDone={() => setNoting(null)} />
+            </Box>
+          )}
+          </>
         }
       >
         <Flex align="center" gap={2} flexWrap="wrap" justify="center">

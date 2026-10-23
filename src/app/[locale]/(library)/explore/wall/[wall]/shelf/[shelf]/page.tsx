@@ -9,7 +9,8 @@ import ExploreHud, { HudLayer, HudSelector } from "@/components/explore/ExploreH
 import type { BookRef } from "@/components/explore/Bookcase";
 import { useStageHandlers, useStageSelector, useStageStore, useStageView } from "@/components/explore/stage/StageProvider";
 import type { StageView } from "@/components/explore/stage/stageStore";
-import { generateRandomHex, shortHex } from "@/lib/hex";
+import { spawnHex } from "@/lib/world";
+import { shortHex } from "@/lib/hex";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
 
 const SHELVES = Array.from({ length: LIBRARY.shelves }, (_, i) => i + 1);
@@ -30,7 +31,7 @@ export default function ShelfExplorePage() {
   const hex = isValidHex(hexParam) ? hexParam : "";
 
   useEffect(() => {
-    if (!hex) router.replace(`/explore/wall/${wall}/shelf/${shelf}?hex=${generateRandomHex()}`, { scroll: false });
+    if (!hex) router.replace(`/explore/wall/${wall}/shelf/${shelf}?hex=${spawnHex()}`, { scroll: false });
   }, [hex, wall, shelf, router]);
 
   const hexQuery = hex ? `?hex=${encodeURIComponent(hex)}` : "";

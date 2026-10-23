@@ -1,7 +1,7 @@
 "use client";
 
 import * as THREE from "three";
-import { ROOM, sideAngle } from "../geometry";
+import { ROOM, sideAngle, wallSide } from "../geometry";
 import { useLibraryMaterials } from "../materials";
 import { DESK, deskCenterLocal, deskCorners, deskLampLocal } from "./deskFrame";
 
@@ -25,7 +25,7 @@ export interface ReadingDeskProps {
  */
 export default function ReadingDesk({ wall, lit }: ReadingDeskProps) {
   const materials = useLibraryMaterials();
-  const a = sideAngle(wall - 1);
+  const a = sideAngle(wallSide(wall));
   const u = { x: Math.cos(a), z: Math.sin(a) };
   const yaw = Math.atan2(u.x, u.z);
   const center = deskCenterLocal(wall);

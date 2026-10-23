@@ -1,18 +1,23 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { Box } from "@chakra-ui/react";
 import { useLocalizedPath, useRouter } from "@/i18n/navigation";
-import ExploreHud, { HudLayer, HudSelector } from "@/components/explore/ExploreHud";
+import ExploreHud, { HudLayer, HudSelector, HudButton } from "@/components/explore/ExploreHud";
 import type { BookRef } from "@/components/explore/Bookcase";
 import type { WorldPlace } from "@/components/explore/HexGalleryScene";
-import { DOOR_INDEX, sideYaw } from "@/components/explore/geometry";
+import { sideWall, sideYaw, wallSide } from "@/components/explore/geometry";
 import { mouseCaptureAvailable } from "@/components/explore/cursor";
 import { useStageHandlers, useStageSelector, useStageStore, useStageView } from "@/components/explore/stage/StageProvider";
 import type { StageView } from "@/components/explore/stage/stageStore";
-import { generateRandomHex, shortHex } from "@/lib/hex";
+import { cellOf, CENTRE, addressOf, formatCoordinate } from "@/lib/world";
+import { useOnlineStore, useOnlineSelector } from "@/components/online/OnlineProvider";
+import { restoreSpawn } from "@/components/online/spawn";
+import GalleryNotes from "@/components/online/GalleryNotes";
+import NoteComposer from "@/components/online/NoteComposer";
+import { shortHex } from "@/lib/hex";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
 
 const WALLS = Array.from({ length: LIBRARY.walls }, (_, i) => i + 1);
@@ -29,11 +34,13 @@ export default function WallExplorePage() {
 
   const hexParam = searchParams.get("hex");
   const hex = isValidHex(hexParam) ? hexParam : "";
+  const online = useOnlineStore();
 
   // A gallery without an address gets one, client-side only, so server and client markup agree.
   useEffect(() => {
-    if (!hex) router.replace(`/explore/wall/${initialWall}?hex=${generateRandomHex()}`, { scroll: false });
-  }, [hex, initialWall, router]);
+    if (hex) return;
+    return restoreSpawn(online, initialWall, (target, wall) => router.replace(`/explore/wall/${wall}?hex=${target}`, { scroll: false }));
+  }, [hex, initialWall, router, online]);
 
   if (!hex) {
     return (
@@ -53,6 +60,9 @@ function GalleryExplorer({ hex, initialWall }: { hex: string; initialWall: numbe
   const t = useTranslations("Gallery");
   const explore = useTranslations("Explore");
   const common = useTranslations("Common");
+  const notes = useTranslations("Notes");
+  const online = useOnlineSelector((s) => s.status === "online");
+  const [composing, setComposing] = useState(false);
   const router = useRouter();
   const localizedPath = useLocalizedPath();
   const store = useStageStore();
@@ -61,11 +71,13 @@ function GalleryExplorer({ hex, initialWall }: { hex: string; initialWall: numbe
   useStageView(view);
 
   // Back from a shelf or a book the world is still the one the visitor walked in: they may be floors away from its start.
-  const [place, setPlace] = useState<WorldPlace>(() => {
+  const [initialPlace] = useState<WorldPlace>(() => {
     const known = store.getSnapshot().place;
-    return known && known.hex === hex ? known : { level: 0, side: "a", hex };
+    return known && known.hex === hex ? known : { level: 0, col: 0, hex, cell: cellOf(hex) };
   });
+  const place = useStageSelector((s) => s.place) ?? initialPlace;
   const placeRef = useRef(place);
+  useLayoutEffect(() => { placeRef.current = place; }, [place]);
   const [facingWall, setFacingWall] = useState(initialWall);
   const lastWallRef = useRef(initialWall);
   const [tooltip, setTooltip] = useState<string | null>(null);
@@ -91,37 +103,33 @@ function GalleryExplorer({ hex, initialWall }: { hex: string; initialWall: numbe
 
   // The address of the gallery the visitor is in, read at call time: these callbacks are fired from
   // the render loop, before React has re-rendered with a new place.
-  const hexQuery = () => `?hex=${encodeURIComponent(placeRef.current.hex)}`;
+  const hexQuery = useCallback(() => `?hex=${encodeURIComponent((store.getSnapshot().place ?? initialPlace).hex)}`, [store, initialPlace]);
 
   const selectWall = useCallback(
     (w: number) => {
-      store.commands.lookAt?.(sideYaw(w - 1), -0.04);
+      store.commands.lookAt?.(sideYaw(wallSide(w)), -0.04);
       setFacingWall(w);
       lastWallRef.current = w;
       window.history.replaceState(null, "", localizedPath(`/explore/wall/${w}${hexQuery()}`));
     },
-    [store, localizedPath]
+    [store, localizedPath, hexQuery]
   );
 
   const onFacingSide = useCallback(
     (side: number) => {
-      if (side === DOOR_INDEX) {
-        setFacingWall(0);
-        return;
-      }
-      const w = side + 1;
+      const w = sideWall(side);
       setFacingWall(w);
+      if (!w) return;
       lastWallRef.current = w;
       window.history.replaceState(null, "", localizedPath(`/explore/wall/${w}${hexQuery()}`));
     },
-    [localizedPath]
+    [localizedPath, hexQuery]
   );
 
   const onPlace = useCallback(
     (next: WorldPlace) => {
       const prev = placeRef.current;
       placeRef.current = next;
-      setPlace(next);
       setBanner(next.level > prev.level ? t("bannerUp") : next.level < prev.level ? t("bannerDown") : t("bannerNext"));
       window.history.replaceState(null, "", localizedPath(`/explore/wall/${lastWallRef.current}?hex=${next.hex}`));
     },
@@ -146,15 +154,15 @@ function GalleryExplorer({ hex, initialWall }: { hex: string; initialWall: numbe
     },
     [t]
   );
-  const onClickBook = useCallback((b: BookRef) => router.push(`/explore/wall/${b.wall}/shelf/${b.shelf}/volume/${b.volume}${hexQuery()}`), [router]);
-  const onClickShelf = useCallback((wall: number, shelf: number) => router.push(`/explore/wall/${wall}/shelf/${shelf}${hexQuery()}`), [router]);
+  const onClickBook = useCallback((b: BookRef) => router.push(`/explore/wall/${b.wall}/shelf/${b.shelf}/volume/${b.volume}${hexQuery()}`), [router, hexQuery]);
+  const onClickShelf = useCallback((wall: number, shelf: number) => router.push(`/explore/wall/${wall}/shelf/${shelf}${hexQuery()}`), [router, hexQuery]);
   const onInteract = useCallback(() => setShowHint(false), []);
 
   // The mouse being taken is not a page matter: `locked` comes from the stage.
   useStageHandlers({ onHoverBook, onClickBook, onHoverShelf, onClickShelf, onFacingSide, onPlace, onInteract });
 
   const title = facingWall === 0 ? t("vestibule") : common("wallN", { n: facingWall });
-  const kicker = place.level === 0 ? t("kicker") : t("kickerFloor", { floor: `${place.level > 0 ? "+" : ""}${place.level}` });
+  const kicker = t("kickerCell", { x: formatCoordinate(place.cell.x), floor: formatCoordinate(place.cell.floor) });
 
   return (
     <HudLayer>
@@ -186,8 +194,17 @@ function GalleryExplorer({ hex, initialWall }: { hex: string; initialWall: numbe
         tooltipAnchor={locked ? "center" : "pointer"}
         tooltip={moving ? null : tooltip}
         banner={banner}
+        extra={online && (
+          <Box position="absolute" left={{ base: 3, md: 6 }} top="100px" pointerEvents="auto">
+            {composing ? <NoteComposer cell={place.cell} anchor={null} onDone={() => setComposing(false)} /> : <GalleryNotes cell={place.cell} />}
+          </Box>
+        )}
       >
         <HudSelector label={common("wall")} items={WALLS} active={facingWall} onSelect={selectWall} />
+        <HudButton onClick={() => router.push(`/explore/wall/1?hex=${addressOf(CENTRE)}`)} title={t("toCentreTitle")}>
+          {t("toCentre")}
+        </HudButton>
+        {online && <HudButton onClick={() => { store.commands.release?.(); setComposing(true); }} title={notes("hereTitle")}>{notes("here")}</HudButton>}
       </ExploreHud>
     </HudLayer>
   );

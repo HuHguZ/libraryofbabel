@@ -1,3 +1,4 @@
+import type { WalkPose } from "./poses";
 import type { BookRef } from "../Bookcase";
 import type { WorldPlace } from "../HexGalleryScene";
 
@@ -55,6 +56,8 @@ export interface StageSnapshot {
 }
 
 export interface StageCommands {
+  visitorPose?(): WalkPose | null;
+  release?(): void;
   lookAt?(yaw: number, pitch?: number): void;
   skip?(): void;
 }
@@ -83,7 +86,7 @@ export function sameView(a: StageView | null, b: StageView | null): boolean {
 }
 
 const samePlace = (a: WorldPlace | null, b: WorldPlace | null): boolean =>
-  a === b || (a !== null && b !== null && a.level === b.level && a.side === b.side && a.hex === b.hex);
+  a === b || (a !== null && b !== null && a.level === b.level && a.col === b.col && a.hex === b.hex);
 
 const sameOrigin = (a: StageSnapshot["origin"], b: StageSnapshot["origin"]): boolean => {
   if (a === b) return true;

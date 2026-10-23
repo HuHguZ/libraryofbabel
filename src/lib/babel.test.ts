@@ -5,56 +5,45 @@ import { createBabel, libraryFor } from "./babel";
 import { DIGS, LIBRARY, MAX_ADDRESS_LENGTH, addressLength, addressPacking, isValidHex } from "./library";
 import { locales } from "@/i18n/locales";
 
-/** Made up, in the shape of real proxy keys: every mark a link can carry. */
-const KEYS = [
-  "hysteria2://Xk3fQ9zLmP2vT7wR@cdn-example.test:443/?obfs=salamander&obfs-password=Qw8Ze2Rt5Yu1Io4P&sni=cdn-example.test#NL1-hy2",
-  "vless://0b7f6a2e-4c1d-4e8b-9a3f-5d2c1b0a9e8f@203.0.113.7:8443?type=tcp&security=reality&pbk=Zx_9-aB3cD4eF5gH6iJ7kL8mN&fp=chrome&sid=6ba85179#DE%20Frankfurt",
-  "ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpQYXNzK3dvcmQvPT0=@198.51.100.2:8388#Test~[1]{2}|3^4`5\\6",
-];
-
-const CODE = `function greet(name) {\n    if (!name) return "Привет, мир!";\n    return \`Hello, \${name}\`; // <b>&amp;</b>\n}\n`;
-
 const random = (alphabet: string, length: number) =>
   Array.from({ length }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
 
 describe("the alphabets", () => {
-  it("hold letters of both cases, the line break and every printable ASCII symbol", () => {
-    expect(ALPHABETS.en.length).toBe(98);
-    expect(ALPHABETS.ru.length).toBe(166);
+  it("hold small letters, the space and six marks", () => {
+    expect(ALPHABETS.ru.length).toBe(40);
+    expect(ALPHABETS.en.length).toBe(33);
     for (const locale of locales) {
       const alphabet = ALPHABETS[locale];
       expect(new Set(alphabet).size).toBe(alphabet.length);
-      for (let code = 32; code < 127; code++) expect(alphabet).toContain(String.fromCharCode(code));
-      expect(alphabet).toContain("\n");
+      for (const mark of " .,!?-:") expect(alphabet).toContain(mark);
+      expect(alphabet).not.toMatch(/[\nA-ZА-ЯЁ0-9"'«»]/);
     }
-    expect(ALPHABETS.ru).toContain("Ё");
-    expect(ALPHABETS.ru).toContain("«");
+    expect(ALPHABETS.ru).toContain("ё");
+    expect(ALPHABETS.ru).not.toMatch(/[a-z]/);
   });
 
-  it("take a key as it is, case and all", () => {
-    for (const locale of locales) for (const key of KEYS) expect(normalizeQuery(key, locale)).toBe(key);
+  it("write capitals small and every kind of whitespace as a space", () => {
+    expect(normalizeQuery("Привет,\r\nМир!\tЁж", "ru")).toBe("привет, мир! ёж");
+    expect(normalizeQuery("Hello\n\nWorld", "en")).toBe("hello  world");
   });
 
-  it("keep line breaks and indentation, spread tabs and unify line ends", () => {
-    expect(normalizeQuery("a\r\nb\rc\n\td  e", "en")).toBe("a\nb\nc\n    d  e");
-    expect(normalizeQuery(CODE, "ru")).toBe(CODE);
-    expect(normalizeQuery("Ёлка — «ёж»", "en")).toBe(' — ""');
-    expect(normalizeQuery("ё “x” – 1", "ru")).toBe('ё "x" — 1');
+  it("turn dashes and the ellipsis into marks and drop the rest", () => {
+    expect(normalizeQuery("Ёлка — «ёж»…", "ru")).toBe("ёлка - ёж...");
+    expect(normalizeQuery("Ёлка — «ёж» 42", "en")).toBe(" -  ");
   });
 
-  it("report what they cannot hold", () => {
-    expect(foreignSymbols("key 🔑 №5\tok\n", "ru")).toEqual(["🔑", "№"]);
-    expect(foreignSymbols("Привет", "en")).toEqual(["П", "р", "и", "в", "е", "т"]);
+  it("report what they cannot hold, but not capitals or whitespace", () => {
+    expect(foreignSymbols("Мир 🔑 №5\tда\n", "ru")).toEqual(["🔑", "№", "5"]);
+    expect(foreignSymbols("Hi, Мир", "en")).toEqual(["М", "и", "р"]);
   });
 });
 
 describe("addresses", () => {
-  it("take one digit per symbol while the alphabet fits the digits, and blocks after that", () => {
+  it("take one digit per symbol: both alphabets fit the 62 digits", () => {
     expect(addressPacking(59)).toMatchObject({ chars: 1, digits: 1 });
-    expect(addressPacking(ALPHABETS.ru.length)).toMatchObject({ chars: 4, digits: 5 });
-    expect(addressPacking(ALPHABETS.en.length)).toMatchObject({ chars: 7, digits: 8 });
-    expect(MAX_ADDRESS_LENGTH).toBe(addressLength(LIBRARY.pageLength, addressPacking(ALPHABETS.ru.length)));
-    expect(MAX_ADDRESS_LENGTH).toBeLessThan(LIBRARY.pageLength * 1.3);
+    expect(addressPacking(ALPHABETS.ru.length)).toMatchObject({ chars: 1, digits: 1 });
+    expect(addressPacking(ALPHABETS.en.length)).toMatchObject({ chars: 1, digits: 1 });
+    expect(MAX_ADDRESS_LENGTH).toBe(LIBRARY.pageLength);
   });
 
   it("give a short last block a width of its own, whatever the size of the alphabet", () => {
@@ -83,22 +72,20 @@ describe.each(locales)("the %s Library", (locale) => {
   const babel = libraryFor(locale);
   const alphabet = ALPHABETS[locale];
 
-  it("finds a key and reads it back from its address", () => {
-    for (const key of KEYS) {
-      const address = babel.search(key);
-      const hex = address.split("-")[0];
-      expect(isValidHex(hex)).toBe(true);
-      expect(babel.getPage(address)).toContain(key);
-      expect(babel.getPage(babel.searchExactly(key)).trim()).toBe(key);
-    }
+  const PHRASE = locale === "ru" ? "в начале было слово, и слово было: книга!" : "in the beginning was the word: a book!";
+
+  it("finds a phrase and reads it back from its address", () => {
+    const address = babel.search(PHRASE);
+    expect(isValidHex(address.split("-")[0])).toBe(true);
+    expect(babel.getPage(address)).toContain(PHRASE);
+    expect(babel.getPage(babel.searchExactly(PHRASE)).trim()).toBe(PHRASE);
   });
 
-  it("finds code with its line breaks", () => {
-    // The English Library has no Cyrillic, so the greeting loses its words there.
-    const code = normalizeQuery(CODE, locale).trim();
-    expect(code.split("\n")).toHaveLength(4);
-    expect(babel.getPage(babel.searchExactly(CODE))).toContain(code);
+  it("finds a phrase typed with capitals and line breaks", () => {
+    const typed = PHRASE.toUpperCase().replace(/ /g, "\n");
+    expect(babel.getPage(babel.searchExactly(typed)).trim()).toBe(PHRASE);
   });
+
 
   it("writes any page and reads the same page back, whatever the length of the text", () => {
     for (let n = 0; n < 40; n++) {
@@ -112,7 +99,7 @@ describe.each(locales)("the %s Library", (locale) => {
   });
 
   it("finds titles", () => {
-    const title = locale === "ru" ? "Ключ: vless://Ab_C" : "Key: vless://Ab_C";
+    const title = locale === "ru" ? "ключ найден!" : "key found!";
     expect(babel.getTitle(babel.searchTitle(title)).trimEnd()).toBe(title);
   });
 
@@ -134,7 +121,7 @@ describe.each(locales)("the %s Library", (locale) => {
 });
 
 describe("normalizeText", () => {
-  it("drops what an alphabet does not have", () => {
-    expect(normalizeText("AbC d!", "abc ")).toBe("b ");
+  it("drops what an alphabet does not have and writes capitals small", () => {
+    expect(normalizeText("AbC d!", "abc ")).toBe("abc ");
   });
 });

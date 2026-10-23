@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db": "docker compose up -d db",
+    "online": "tsx watch --env-file=.env.local src/server/index.ts"
   },
   "keywords": [
     "library",
@@ -28,10 +30,12 @@
     "motion": "^13.2.0",
     "next": "^16.3.5",
     "next-intl": "^4.14.5",
+    "postgres": "^3.4.9",
     "postprocessing": "^6.39.5",
     "react": "~19.2.8",
     "react-dom": "~19.2.8",
-    "three": "^0.186.0"
+    "three": "^0.186.0",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",
@@ -40,9 +44,11 @@
     "@types/react": "~19.2.14",
     "@types/react-dom": "~19.2.3",
     "@types/three": "^0.186.0",
+    "@types/ws": "^8.18.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.5",
     "jsdom": "^29.1.1",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vitest": "^5.0.1"
   }

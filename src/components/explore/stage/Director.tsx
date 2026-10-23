@@ -1,5 +1,7 @@
 "use client";
 
+import { cellOf } from "@/lib/world";
+
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
@@ -9,7 +11,6 @@ import { PULL_OUT, TITLED_PULL_OUT, type BookRef } from "../Bookcase";
 import { setCanvasCursor } from "../cursor";
 import type { GalleryControlsHandle, GalleryControlsMode } from "../GalleryControls";
 import GalleryWorld, { type HiddenVolume, type ShelfDetail } from "../HexGalleryScene";
-import type { GallerySide } from "../geometry";
 import { LibraryMaterialsProvider } from "../materials";
 import { DeskBookWarmUp } from "./bookParts";
 import DeskBook, { type BookMotion, type BookOrbit } from "./DeskBook";
@@ -58,7 +59,7 @@ const MAX_STEP = 0.1;
 /** A neighbour swap plays both of its flights this much faster. */
 const SWAP_SPEED = 1.5;
 
-type Place = { level: number; side: GallerySide };
+type Place = { level: number; col: number };
 
 /** The world on the stage: its address, which build of it this is, and where the eye and the visitor start when it mounts. */
 interface WorldMount {
@@ -124,7 +125,7 @@ type FlightPlan = Pick<Flight, "kind" | "timeline" | "from" | "to" | "first" | "
 const viewHex = (view: StageView) => (view.kind === "desk" ? view.book.hex : view.hex);
 
 /** The close-up of a shelf, as a shot. */
-const closeupShot = (place: Place, wall: number, shelf: number) => walkShot(closeupPose(place.level, place.side, wall, shelf).pose, SHELF_FOV);
+const closeupShot = (place: Place, wall: number, shelf: number) => walkShot(closeupPose(place.level, place.col, wall, shelf).pose, SHELF_FOV);
 
 const newShot = (): CameraShot => ({ position: new THREE.Vector3(), target: new THREE.Vector3(), fov: 0, near: 0 });
 const newStageFrame = (): StageFrame => ({ camera: newShot(), book: null, openness: 0, deskLight: 0 });
@@ -250,7 +251,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
         controls.teleport(eye.position, eye.yaw, eye.pitch, eye.fov);
       } else {
         const place = store.getSnapshot().place ?? START;
-        const closeup = closeupPose(place.level, place.side, target.wall, target.shelf);
+        const closeup = closeupPose(place.level, place.col, target.wall, target.shelf);
         const turned = nearestYaw(yaw, closeup.pose.yaw, closeup.yawRange);
         const eye = shot
           ? { position: shot.position, ...shotAngles(shot, turned.yaw), fov: shot.fov }
@@ -511,14 +512,14 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
         const hex = viewHex(next);
         const wall = next.kind === "desk" ? next.book.wall : next.wall;
         armVeil(target.kind === "desk");
-        store.patch({ place: { ...START, hex } });
+        store.patch({ place: { ...START, hex, cell: cellOf(hex) } });
         // A book the stage opens on arrival was taken from nowhere: back from it is the walk.
         if (target.kind === "desk") store.patch({ origin: { kind: "walk" } });
         controller.current = target;
-        visitorPose.current = next.kind === "walk" ? acrossFromWall(wall) : visitorAtDesk(START.level, START.side, wall);
-        const pose = target.kind === "shelf" ? closeupPose(START.level, START.side, target.wall, target.shelf).pose : visitorPose.current;
+        visitorPose.current = next.kind === "walk" ? acrossFromWall(wall) : visitorAtDesk(START.level, START.col, wall);
+        const pose = target.kind === "shelf" ? closeupPose(START.level, START.col, target.wall, target.shelf).pose : visitorPose.current;
         pending.current = target;
-        if (target.kind === "desk") lookAtDesk(deskFrame(START.level, START.side, target.book.wall));
+        if (target.kind === "desk") lookAtDesk(deskFrame(START.level, START.col, target.book.wall));
         const build = (current?.world.build ?? 0) + 1;
         const world = { hex, build, pose, place: START };
         stage({ world, controller: target, placeHex: hex, place: START, books: restingBooks(target, wall), closeup: closeupAt(target) });
@@ -531,7 +532,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
       const controls = controlsRef.current;
       // Leaving the walk: remember exactly where the visitor stood.
       if (from.kind === "walk" && controls) visitorPose.current = controls.getPose();
-      const here: Place = { level: place.level, side: place.side };
+      const here: Place = { level: place.level, col: place.col };
       const at: Staging = { ...current, placeHex: place.hex, place: here };
       // The desk the reader is at: the one the book on the stage lies on, which a neighbour from the next wall comes to as well.
       const readerDesk = current.books.find((b) => b.shown)?.desk;
@@ -548,8 +549,8 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
         return;
       }
 
-      const deskAt = (wall: number) => deskFrame(here.level, here.side, wall);
-      const shelfOf = (book: BookAddress) => shelfBookPose(here.level, here.side, book.wall, book.shelf, book.volume, hashString(book.hex));
+      const deskAt = (wall: number) => deskFrame(here.level, here.col, wall);
+      const shelfOf = (book: BookAddress) => shelfBookPose(here.level, here.col, book.wall, book.shelf, book.volume, hashString(book.hex));
       const seedOf = (book: BookAddress) => hashString(bookKey(book));
       /** The camera as it is: its eye, where the reader's orbit of `book` looks (or straight ahead), its lens. */
       const shotNow = (book: BookAddress): CameraShot => ({
@@ -567,7 +568,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
         controls.setActive(false);
         const { book } = target;
         const desk = deskAt(book.wall);
-        const intoTheRoom = intoRoom(here.side, book.wall);
+        const intoTheRoom = intoRoom(book.wall);
         // A volume clicked under the pointer stands pulled out of its row (further on the titled close-up shelf).
         const bookFrom = shelfOf(book);
         const titled = from.kind === "shelf" && from.wall === book.wall && from.shelf === book.shelf;
@@ -591,7 +592,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
           cameraFrom: shotNow(from.book),
           bookFrom: deskBookPose(deskAt(desk)),
           bookTo: shelfOf(from.book),
-          shelfNormal: intoRoom(here.side, from.book.wall),
+          shelfNormal: intoRoom(from.book.wall),
           cameraTo: walkTo,
           seed: seedOf(from.book),
         });
@@ -617,7 +618,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
           cameraFrom,
           bookFrom: deskBookPose(frame),
           bookTo: shelfOf(from.book),
-          shelfNormal: intoRoom(here.side, from.book.wall),
+          shelfNormal: intoRoom(from.book.wall),
           cameraTo: home,
           seed: seedOf(from.book),
         });
@@ -625,7 +626,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
           cameraFrom: home,
           bookFrom: shelfOf(target.book),
           bookTo: deskBookPose(frame),
-          shelfNormal: intoRoom(here.side, target.book.wall),
+          shelfNormal: intoRoom(target.book.wall),
           cameraTo: home,
           seed: seedOf(target.book),
         });
@@ -683,8 +684,23 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
 
   useEffect(() => {
     store.commands.lookAt = (yaw, pitch) => controlsRef.current?.lookAt(yaw, pitch);
+    store.commands.release = () => controlsRef.current?.unlock();
+    // For others to see: the eye while walking, the spot left for a close-up, or standing at the desk of the book read.
+    store.commands.visitorPose = () => {
+      const state = controller.current;
+      const place = store.getSnapshot().place;
+      if (!state || !place) return null;
+      if (state.kind === "walk" && !flight.current) return controlsRef.current?.getPose() ?? visitorPose.current;
+      if (state.kind === "desk") {
+        const desk = staging.current?.books.find((b) => b.shown)?.desk ?? state.book.wall;
+        return visitorAtDesk(place.level, place.col, desk);
+      }
+      return visitorPose.current;
+    };
     return () => {
       delete store.commands.lookAt;
+      delete store.commands.visitorPose;
+      delete store.commands.release;
     };
   }, [store, controlsRef]);
 
@@ -758,7 +774,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
       },
       hide(wall: number, shelf: number, volume: number) {
         const place = store.getSnapshot().place ?? START;
-        setHiddenVolume({ level: place.level, side: place.side, wall, shelf, volume });
+        setHiddenVolume({ level: place.level, col: place.col, wall, shelf, volume });
       },
       lightDesk(wall: number | null) {
         setDeskLamp(wall === null ? null : { wall, intensity: DESK_LAMP_INTENSITY });
@@ -800,7 +816,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
 
   // A book off its shelf (on a desk or in the air) leaves a gap there and lights the lamp of its desk, in the gallery the visitor is in.
   const level = shown?.place.level ?? START.level;
-  const side = shown?.place.side ?? START.side;
+  const col = shown?.place.col ?? START.col;
   const off = shown?.books.find((b) => b.shown);
   const offWall = off?.book.wall;
   const offShelf = off?.book.shelf;
@@ -808,8 +824,8 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
   const offDesk = off?.desk;
   const gap = useMemo<HiddenVolume | null>(
     () =>
-      offWall !== undefined && offShelf !== undefined && offVolume !== undefined ? { level, side, wall: offWall, shelf: offShelf, volume: offVolume } : null,
-    [level, side, offWall, offShelf, offVolume]
+      offWall !== undefined && offShelf !== undefined && offVolume !== undefined ? { level, col, wall: offWall, shelf: offShelf, volume: offVolume } : null,
+    [level, col, offWall, offShelf, offVolume]
   );
   const lamp = useMemo(() => (offDesk !== undefined ? { wall: offDesk, intensity: DESK_LAMP_INTENSITY } : null), [offDesk]);
   // Fixed while the store lives, like `on`: the memoised world must not re-render for it. While a flight plays the world
@@ -928,7 +944,7 @@ function Book({ staged, place, link, spineTitle, onReady }: BookProps) {
   const desk = useStageSelector((s) => s.desk);
   const moving = useStageSelector((s) => s.moving);
   const seed = useMemo(() => hashString(book.hex), [book.hex]);
-  const frame = useMemo(() => deskFrame(place.level, place.side, staged.desk), [place.level, place.side, staged.desk]);
+  const frame = useMemo(() => deskFrame(place.level, place.col, staged.desk), [place.level, place.col, staged.desk]);
   // The inputs in the store are this book's own while its page is the one on show (a page publishes its view before its
   // inputs), unless a click took the book with them in the store. A book leaving the stage keeps the last of its own
   // (a swap's departing book closes on its own pages); one whose page has published nothing yet shows its index.

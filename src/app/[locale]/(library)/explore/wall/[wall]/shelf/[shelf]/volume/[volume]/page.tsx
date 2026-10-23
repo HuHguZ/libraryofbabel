@@ -8,7 +8,8 @@ import { Link, useRouter } from "@/i18n/navigation";
 import ExploreHud, { HudLayer } from "@/components/explore/ExploreHud";
 import { useStageDesk, useStageHandlers, useStageSelector, useStageView } from "@/components/explore/stage/StageProvider";
 import type { DeskInputs, StageView } from "@/components/explore/stage/stageStore";
-import { generateRandomHex, shortHex } from "@/lib/hex";
+import { spawnHex } from "@/lib/world";
+import { shortHex } from "@/lib/hex";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
 
 const mono = "var(--font-jetbrains), monospace";
@@ -59,7 +60,7 @@ export default function VolumeExplorePage() {
   const hex = isValidHex(hexParam) ? hexParam : "";
 
   useEffect(() => {
-    if (!hex) router.replace(`/explore/wall/${wall}/shelf/${shelf}/volume/${volume}?hex=${generateRandomHex()}`, { scroll: false });
+    if (!hex) router.replace(`/explore/wall/${wall}/shelf/${shelf}/volume/${volume}?hex=${spawnHex()}`, { scroll: false });
   }, [hex, wall, shelf, volume, router]);
 
   const hexQuery = hex ? `?hex=${encodeURIComponent(hex)}` : "";

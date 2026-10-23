@@ -1,7 +1,9 @@
+import { LIBRARY } from "@/lib/library";
+import { wallSide } from "../geometry";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { sideAngle, sideYaw, viewpointForSide } from "../geometry";
-import { galleryToWorld, galleryYaw } from "./deskFrame";
+import { galleryToWorld } from "./deskFrame";
 import {
   START,
   acrossFromWall,
@@ -68,14 +70,14 @@ describe("sameController", () => {
 
 describe("acrossFromWall", () => {
   it("stands at the walk viewpoint across from the wall, facing it, pitched slightly down", () => {
-    for (const wall of [1, 2, 3, 4, 5]) {
+    for (const wall of Array.from({ length: LIBRARY.walls }, (_, i) => i + 1)) {
       const pose = acrossFromWall(wall);
-      const [x, y, z] = viewpointForSide(wall - 1);
-      const want = galleryToWorld(START.level, START.side, { x, y, z });
+      const [x, y, z] = viewpointForSide(wallSide(wall));
+      const want = galleryToWorld(START.level, START.col, { x, y, z });
       expect(pose.position.x).toBeCloseTo(want.x, 12);
       expect(pose.position.y).toBeCloseTo(want.y, 12);
       expect(pose.position.z).toBeCloseTo(want.z, 12);
-      expect(pose.yaw).toBeCloseTo(sideYaw(wall - 1) + galleryYaw(START.side), 12);
+      expect(pose.yaw).toBeCloseTo(sideYaw(wallSide(wall)), 12);
       expect(pose.pitch).toBe(-0.04);
     }
   });
@@ -140,9 +142,9 @@ describe("flyingBooks", () => {
 
 describe("intoRoom", () => {
   it("points from the wall into the room, horizontally, as a unit vector", () => {
-    for (const wall of [1, 2, 3, 4, 5]) {
-      const v = intoRoom("a", wall);
-      const a = sideAngle(wall - 1);
+    for (const wall of Array.from({ length: LIBRARY.walls }, (_, i) => i + 1)) {
+      const v = intoRoom(wall);
+      const a = sideAngle(wallSide(wall));
       expect(v.y).toBe(0);
       expect(v.x).toBeCloseTo(-Math.cos(a), 12);
       expect(v.z).toBeCloseTo(-Math.sin(a), 12);
@@ -150,12 +152,7 @@ describe("intoRoom", () => {
     }
   });
 
-  it("turns the other way in a gallery turned a half turn", () => {
-    const inA = intoRoom("a", 1);
-    const inB = intoRoom("b", 1);
-    expect(inB.x).toBeCloseTo(-inA.x, 9);
-    expect(inB.z).toBeCloseTo(-inA.z, 9);
-  });
+
 });
 
 describe("shotAngles", () => {

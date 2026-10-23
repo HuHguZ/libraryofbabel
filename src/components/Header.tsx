@@ -49,7 +49,7 @@ export default function Header() {
         h="100%"
         align="center"
         justify="space-between"
-        px={{ base: 4, md: 6 }}
+        px={{ base: 2, md: 6 }}
         variants={fadeIn}
         initial="hidden"
         animate="visible"
@@ -95,10 +95,10 @@ export default function Header() {
               key={link.href}
               asChild
               color="dark.200"
-              fontSize={{ base: "xs", sm: "sm" }}
+              fontSize={{ base: "11px", sm: "sm" }}
               fontWeight="400"
               letterSpacing="0.05em"
-              px={{ base: 1.5, sm: 3 }}
+              px={{ base: 1, sm: 3 }}
               py={1}
               borderRadius="4px"
               transition="all 0.2s ease"
@@ -122,12 +122,12 @@ export default function Header() {
               onClick={handleRandom}
               bg="transparent"
               color="dark.200"
-              fontSize={{ base: "xs", sm: "sm" }}
+              fontSize={{ base: "11px", sm: "sm" }}
               fontWeight="400"
               letterSpacing="0.05em"
               variant="plain"
               disabled={loading}
-              px={{ base: 1.5, sm: 3 }}
+              px={{ base: 1, sm: 3 }}
               py={1}
               minW="auto"
               h="auto"

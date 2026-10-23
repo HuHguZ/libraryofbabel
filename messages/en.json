@@ -58,19 +58,19 @@
       "kicker": "Architecture",
       "title": "How the Library is built",
       "galleryTitle": "A hexagonal gallery",
-      "galleryText": "Every gallery has six walls. Five of them are lined with shelves; the sixth opens onto a vestibule with a mirror, a spiral staircase and the next gallery.",
+      "galleryText": "Every gallery has six walls. Four of them are lined with shelves; the other two open onto vestibules with a mirror, a spiral staircase and the neighbouring galleries of the same floor.",
       "wallsTitle": "{walls} walls of {shelves} shelves",
       "wallsText": "Every wall has seven shelves, and every shelf holds thirty-one volumes of the same size.",
       "pagesTitle": "{pages, plural, one {# page} other {# pages}}",
       "pagesText": "Every volume has four hundred and twenty-one pages, each of them four thousand eight hundred and nineteen characters long.",
       "booksTitle": "Every possible book",
-      "booksText": "The Library holds every possible combination of {symbols, plural, one {# symbol} other {# symbols}}: letters of both cases, digits, the space, the line break and punctuation marks. Every conceivable book has already been written."
+      "booksText": "The Library holds every possible combination of {symbols, plural, one {# symbol} other {# symbols}}: lowercase letters, the space and six punctuation marks. Every conceivable book has already been written."
     },
     "numbers": {
       "kicker": "Scale",
       "title": "The numbers of infinity",
       "alphabet": "{count, plural, one {symbol in the alphabet} other {symbols in the alphabet}}",
-      "alphabetNote": "{letters, plural, one {# letter} other {# letters}} of both cases, {digits, plural, one {# digit} other {# digits}}, the space, the line break and {marks, plural, one {# mark} other {# marks}}",
+      "alphabetNote": "{letters, plural, one {# lowercase letter} other {# lowercase letters}}, the space and {marks, plural, one {# mark} other {# marks}}: . , ! ? - :",
       "pageLength": "{count, plural, one {character per page} other {characters per page}}",
       "pageLengthNote": "every page is a unique point in the space of all texts",
       "pages": "{count, plural, one {page per volume} other {pages per volume}}",
@@ -115,7 +115,7 @@
     "modeSearch": "Search",
     "modeExact": "Exact",
     "modeTitle": "Title",
-    "alphabetHint": "The Library holds English letters of both cases, digits, the space, the line break and ASCII marks",
+    "alphabetHint": "The Library holds only lowercase English letters, the space and . , ! ? - : — capitals become lowercase, line breaks become spaces",
     "foreign": " — <mark>{symbols}</mark> cannot be found",
     "willSearch": "Searching for: <phrase>“{query}”</phrase>",
     "typeInAlphabet": "Type your text in English letters."
@@ -135,17 +135,19 @@
   },
   "Gallery": {
     "kicker": "Hexagonal gallery",
-    "kickerFloor": "Hexagonal gallery · floor {floor}",
     "vestibule": "Vestibule",
     "bannerUp": "You have climbed to the gallery one floor up. The staircase goes on upwards.",
     "bannerDown": "You have gone down to the gallery one floor below. The staircase goes on downwards.",
     "bannerNext": "You have entered the next gallery. The same shelves, different books.",
     "tooltipBook": "Wall {wall} · Shelf {shelf} · Volume {volume}",
     "tooltipShelf": "Wall {wall} · Shelf {shelf} — open the shelf",
-    "hintDesktop": "W A S D — walk, Shift — run, space — jump, wheel — zoom. Click a volume to send it flying to a reading desk, or click a shelf for a closer look. The spiral staircase in the vestibule leads to the galleries above and below; the far door leads to the next one.",
+    "hintDesktop": "W A S D — walk, Shift — run, space — jump, wheel — zoom. Click a volume to send it flying to a reading desk, or click a shelf for a closer look. The spiral staircase in the vestibule leads to the galleries above and below; the doors lead to the neighbouring galleries of the floor.",
     "hintTouch": "Drag a finger to look around; use two fingers to walk. Tap a volume to send it flying to a reading desk, or tap a shelf for a closer look.",
     "lockOn": "The mouse steers your gaze · a click opens what is under the crosshair · Esc releases the cursor",
-    "lockOff": "Click the scene to steer with the mouse, like in a game · Esc releases the cursor"
+    "lockOff": "Click the scene to steer with the mouse, like in a game · Esc releases the cursor",
+    "kickerCell": "Gallery {x} · floor {floor}",
+    "toCentre": "To the centre",
+    "toCentreTitle": "To gallery 0 · 0, the centre of the Library"
   },
   "Shelf": {
     "kicker": "Bookshelf",
@@ -204,7 +206,9 @@
     "shareFragment": "link to fragment",
     "shareFragmentTitle": "Copy a link that opens this spread with the fragment marked",
     "linkCopied": "link copied ✓",
-    "clearFragment": "Clear the mark"
+    "clearFragment": "Clear the mark",
+    "leaveNote": "note",
+    "leaveNoteTitle": "Leave a note on the marked fragment — everyone will see it"
   },
   "Address": {
     "label": "Address in the Library",
@@ -225,5 +229,65 @@
     "title": "This page is not even in the Library",
     "text": "Though everything else is.",
     "home": "Back to the home page"
+  },
+  "Online": {
+    "online": "{count, plural, one {# reader} other {# readers}} in the Library",
+    "alone": "You are alone in the Library",
+    "connecting": "Connecting…",
+    "offline": "A Library of your own",
+    "you": "You",
+    "nick": "Name",
+    "save": "Save",
+    "walking": "wandering · gallery {x} · floor {floor}",
+    "atShelf": "at shelf {shelf} of wall {wall} · gallery {x} · floor {floor}",
+    "reading": "reading: wall {wall}, shelf {shelf}, volume {volume}, p. {page} · gallery {x} · floor {floor}",
+    "goTo": "Go to reader",
+    "color": "Clothing colour"
+  },
+  "Notes": {
+    "here": "Note here",
+    "hereTitle": "Leave a note in this gallery for everyone to see",
+    "placeholder": "What is here? Up to 300 characters",
+    "save": "Leave it",
+    "cancel": "Cancel",
+    "title": "{count, plural, one {# note} other {# notes}} in this gallery",
+    "onPage": "to page {page}",
+    "forget": "delete"
+  },
+  "Chat": {
+    "close": "Close chat",
+    "open": "T — write",
+    "placeholder": "A message for everyone in the Library…",
+    "send": "Send",
+    "share": "Place",
+    "shareTitle": "Attach where you are (the gallery, the book, the page, the marked fragment)",
+    "shared": "place attached",
+    "go": "go",
+    "forget": "delete",
+    "ban": "ban",
+    "banTitle": "Bar this guest from writing and coming in",
+    "adminOn": "You moderate this Library",
+    "adminOff": "You no longer moderate",
+    "rate": "Too fast — wait a little",
+    "length": "Empty, or longer than 300 characters",
+    "banned": "You may not write in this Library",
+    "invalid": "Message not accepted",
+    "banConfirm": "Ban {nick}?"
+  },
+  "Map": {
+    "address": "Gallery address",
+    "walking": "walking",
+    "atShelf": "at shelf {shelf} of wall {wall}",
+    "reading": "reading: wall {wall}, shelf {shelf}, volume {volume}, p. {page}",
+    "open": "Map (M)",
+    "title": "Map of the Library",
+    "hint": "Drag the map, wheel to zoom, M or Esc to close",
+    "gallery": "Gallery {x} · floor {floor}",
+    "explored": "Someone has been here",
+    "unexplored": "Nobody has been here yet",
+    "goHere": "Go here",
+    "goTo": "Go to this reader",
+    "openBook": "Open what they have open",
+    "close": "Close"
   }
 }

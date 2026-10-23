@@ -29,13 +29,13 @@ export function ExploreStage({ children }: { children: ReactNode }) {
  * take it back), stays above the loading veil, and fades in with the page. Opacity only: a transformed ancestor would
  * become the containing block of the fixed pointer tooltip.
  */
-export function HudLayer({ children }: { children: ReactNode }) {
+export function HudLayer({ children, zIndex = 4 }: { children: ReactNode; zIndex?: number }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      style={{ position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none" }}
+      style={{ position: "absolute", inset: 0, zIndex, pointerEvents: "none" }}
     >
       {children}
     </motion.div>

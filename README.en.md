@@ -39,7 +39,7 @@ The Library speaks **two languages**. The `RU | EN` switch in the header changes
 
 The galleries never end. Beyond the door is a vestibule with a spiral staircase, beyond that the next gallery, and above and below there are more galleries still. Everything nearby is already loaded and drawn, so crossing from one gallery into the next gives nothing away: the world simply goes on.
 
-At the shaft railing, opposite each of the five walls of shelves, stands a reading desk with a brass lamp &mdash; a volume taken from that wall comes to rest on it.
+At the shaft railing, opposite each of the four walls of shelves, stands a reading desk with a brass lamp &mdash; a volume taken from that wall comes to rest on it.
 
 <p align="center">
   <img src="docs/screenshots/walk.webp" alt="Walking out of a gallery, through the door, past the spiral staircase and into the next gallery" width="100%" />
@@ -48,8 +48,8 @@ At the shaft railing, opposite each of the five walls of shelves, stands a readi
 <table>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/en/gallery.jpg" alt="Five walls of bookshelves around the ventilation shaft, reading desks with lamps at the railing" />
-      <br><sub><b>A hexagonal gallery.</b> Five walls of shelves, a lamp overhead and reading desks at the railing of the shaft.</sub>
+      <img src="docs/screenshots/en/gallery.jpg" alt="Four walls of bookshelves around the ventilation shaft, reading desks with lamps at the railing" />
+      <br><sub><b>A hexagonal gallery.</b> Four walls of shelves, a lamp overhead and reading desks at the railing of the shaft.</sub>
     </td>
     <td width="50%">
       <img src="docs/screenshots/en/aim.jpg" alt="The crosshair in the centre of the screen rests on a volume; a tooltip names its wall, shelf and number" />
@@ -131,15 +131,14 @@ Just as Borges described it:
 ```
   gallery        wall        shelf        volume        page
  ┌─────────┐   ┌───────┐   ┌───────┐   ┌────────┐   ┌─────────┐
- │ address │ → │ 1 — 5 │ → │ 1 — 7 │ → │ 1 — 31 │ → │ 1 — 421 │
+ │ address │ → │ 1 — 4 │ → │ 1 — 7 │ → │ 1 — 31 │ → │ 1 — 421 │
  └─────────┘   └───────┘   └───────┘   └────────┘   └─────────┘
 
-  every page holds 4,819 characters of a 98-symbol alphabet:
-  52 Latin letters of both cases, 10 digits, the space,
-  the line break and 34 marks: all of printable ASCII and — …
+  every page holds 4,819 characters of a 33-symbol alphabet:
+  26 lowercase English letters, the space and six marks: . , ! ? - :
 ```
 
-The English Library has 98<sup>4819</sup> ≈ 5.2 × 10<sup>9595</sup> distinct pages. Borges' alphabet was more modest: 22 letters, the space, the comma and the full stop. Ours has everything links, keys and code are written with, so you can find a proxy key or a JavaScript function in it, capitals, indentation, line breaks and all.
+The English Library has 33<sup>4819</sup> ≈ 5.2 × 10<sup>7317</sup> distinct pages. Its alphabet contains only lowercase letters, the space and six punctuation marks, making words more common among random text. Links made before this alphabet change may show different text.
 
 A gallery address is a string of digits and Latin letters in both cases (62 "digits"). Every address leads to a gallery of its own, and that gallery always holds the same books. The galleries and shelves in the screenshots above come from the gallery at address `babel`.
 
@@ -154,11 +153,11 @@ The `RU | EN` switch on the right of the header translates the whole site: the m
 | | Russian Library | English Library |
 |---|---|---|
 | URLs | `/`, `/page/…`, `/explore/…` | `/en`, `/en/page/…`, `/en/explore/…` |
-| Letters | 33 Russian and 26 Latin, lower and upper case | 26 Latin, lower and upper case |
-| Digits, spacing | 10, the space and the line break | 10, the space and the line break |
-| Marks | all of printable ASCII and `— … « »` | all of printable ASCII and `— …` |
-| Symbols in all | 166 | 98 |
-| Distinct pages | 166<sup>4819</sup> ≈ 5.0 × 10<sup>10698</sup> | 98<sup>4819</sup> ≈ 5.2 × 10<sup>9595</sup> |
+| Letters | 33 lowercase Russian | 26 lowercase English |
+| Spacing | the space | the space |
+| Marks | `. , ! ? - :` | `. , ! ? - :` |
+| Symbols in all | 40 | 33 |
+| Distinct pages | 40<sup>4819</sup> ≈ 2.1 × 10<sup>7720</sup> | 33<sup>4819</sup> ≈ 5.2 × 10<sup>7317</sup> |
 
 The same address holds different text in the two Libraries, so the language is part of the link: a link to an English page opens the English page even for someone who has chosen Russian. Your choice is remembered and used on the home page; on the very first visit the home page follows your browser's language.
 
@@ -178,7 +177,7 @@ The same address holds different text in the two Libraries, so the language is p
 
 **Copy and share a fragment** &mdash; the &ldquo;text & address&rdquo; panel beside the open book shows the text of the spread: copy a whole page with one button, or select a few lines and copy a link to them. The link opens the same spread with the panel already open and the fragment marked, both in the text and on the page of the 3D book, and the camera glides over to it. While you select, the book marks the same characters. The mark can take any colour: the swatch next to &ldquo;fragment&rdquo; opens a colour picker with ready-made colours, and your choice is remembered in the browser.
 
-The search box takes several lines: `Enter` searches, `Shift+Enter` starts a new line, and you can paste a poem or a piece of code. Case, spaces and line breaks are kept as they are, a tab becomes four spaces, typographic variants are brought into the alphabet (`“ ”` → `"`, `–` → `—`), and symbols the Library does not have (emoji, say) are dropped. The search box shows in advance what will actually be searched for.
+The search box takes several lines: `Enter` searches and `Shift+Enter` starts a new line. Capitals become lowercase, line breaks and tabs become spaces, dashes become hyphens and an ellipsis becomes three full stops. Digits, letters from another alphabet, quotes and other unsupported characters are dropped. The box previews the text that will be found.
 
 The Library is not a safe: a page's address is its text, written reversibly by an open algorithm. Whoever has the link can read the key that lies on the page.
 
@@ -227,12 +226,34 @@ npm run typecheck            # tsc --noEmit
 npm test                     # tests (Vitest)
 ```
 
+## The shared Library
+
+RU and EN have separate players, maps, notes and chat. If the online server or database is unavailable, the site continues in solo mode.
+
+Local online mode needs Docker Desktop. Copy `.env.example` to `.env.local`, fill `GUEST_SECRET` and `ADMIN_TOKEN` with independent random strings (the example includes a generator), then use separate terminals:
+
+```bash
+npm run db       # Postgres 17: localhost:5433, persistent pgdata volume
+npm run online   # WebSocket: localhost:3001
+npm run dev      # Next.js: localhost:3000
+```
+
+Behind a proxy, set `NEXT_PUBLIC_WS_URL` (`wss://` for HTTPS). Enable `TRUST_PROXY=1` only behind a trusted proxy that overwrites X-Forwarded-For. A signed httpOnly cookie identifies guests; the panel lets them change nickname and clothing colour. Returning readers resume in their last gallery, newcomers arrive near the centre. Other readers appear in the world and roster with their current book and page.
+
+The minimap shows shared exploration. `M` opens the full map: drag to pan, wheel to zoom, click a gallery, reader or note to teleport. Coordinates and “To the centre” are in the HUD. Exploration is stored in 32×32 gallery chunks.
+
+`T` opens chat; `Enter` sends and `Esc` closes. “Share place” attaches the gallery, book and selected fragment as a clickable destination. Recent messages fade after 10 seconds; the last 200 are kept. Leave a gallery note from the HUD or a fragment note from the reader's text panel. Notes appear in lists, on the map, as book ribbons and as a sheet beside the door.
+
+Chat and notes accept up to 300 characters. Chat allows one message per two seconds with a burst of five; notes allow ten per hour with a burst of three. Limits apply to both guest and IP. Authors delete their own entries. `/admin <token>` (`ADMIN_TOKEN`) enables deleting any entry and banning guests/IPs; the token stays in this browser's localStorage and never goes into public chat.
+
+One server keeps poses in memory and broadcasts them to all readers, intended for roughly 100 concurrent readers. Multiple servers would need shared pub/sub. VPS deployment, HTTPS and backups are a separate step. Avatar: [Quaternius Man, CC0](public/models/README.md).
+
 ## Under the hood
 
-- **An endless world.** Two galleries share one vestibule, the pairs repeat floor after floor, and the spiral staircase makes one full turn per floor. The neighbouring galleries (through the door, above and below) stay in the scene with their own materials, while distant floors are lightweight copies. The number of lights never changes, so no shader is recompiled as you walk on.
+- **One world with coordinates.** Galleries stand in rows on every floor: four walls of books and two opposite doors, with a staircase in every vestibule between them. Address ↔ column and floor is an exact reversible BigInt mapping (`src/lib/world.ts`); neighbouring galleries have unrelated addresses. The centre is 0 · 0. Nine nearby galleries use their own materials, distant floors are simplified, and the scene always keeps 11 lights.
 - **One scene for all of it.** The gallery, the shelf up close, the open volume and the reader are not four pages but four states of one scene: the canvas lives in a shared route layout, and a director plays the flights between the states along timelines computed in advance (`src/components/explore/stage`). That is why the book really does fly from the shelf to the desk instead of being replaced by another screen &mdash; and every state is still a plain link you can open directly, while going back mid-flight turns the flight around from wherever it had got to.
 - **Determinism.** The addresses of neighbouring galleries are derived from the starting one, so the way back leads to the same books. A gallery's look &mdash; floor, walls, ceiling, shelf wood, leather and binding colours &mdash; is picked from its address too.
-- **A reversible algorithm.** Every character of a page is shifted by a pseudo-random keystream seeded from the wall, shelf, volume and page, and the shifted characters are written as address "digits" in blocks: 4 characters of the Russian Library as 5 digits, 7 characters of the English one as 8. A block is read as one number, so a page address takes at most 6,024 characters, only 1% over the theoretical minimum for 62 digits. Search writes a text into an address, reading brings it back (`src/lib/babel.ts`; the packing is in `src/lib/library.ts`, the alphabets in `src/lib/alphabet.ts`).
+- **A reversible algorithm.** Page characters are shifted by a keystream seeded by wall, shelf, volume and page. Each character takes one address digit, up to 4,819 digits. Search writes text into an address and reading reverses it (`src/lib/babel.ts`, `src/lib/library.ts`, `src/lib/alphabet.ts`).
 - **Long links.** An address plus the search phrase `q` can run to tens of kilobytes, and Node rejects requests with headers over 16 KB by default (error 431). `.npmrc` raises that limit for `npm run dev` and `npm start`.
 - **Line breaks on the 3D page.** A line ends where the text breaks and wraps after 80 characters. When that makes more than 61 lines, the type gets smaller and the lines longer, just enough for the whole text to fit the leaf (`layoutPage` in `src/components/explore/bookPages.ts`).
 - **Internationalization** with [next-intl](https://next-intl.dev): translations in `messages/ru.json` and `messages/en.json`, routes under a `[locale]` segment, Russian without a prefix. `src/proxy.ts` detects the language on the home page only; every other link is never redirected to another language.

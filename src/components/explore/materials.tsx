@@ -132,18 +132,43 @@ export interface LibraryMaterials {
 
 const MaterialsContext = createContext<LibraryMaterials | null>(null);
 
+/** An owned sampler over unchanged pixels; Texture.clone() would mark the shared image dirty and upload it again. */
+export function textureView(source: THREE.Texture, anisotropy = source.anisotropy): THREE.Texture {
+  const tex = new THREE.Texture();
+  tex.needsUpdate = true;
+  Object.assign(tex, {
+    source: source.source, mapping: source.mapping, channel: source.channel,
+    wrapS: source.wrapS, wrapT: source.wrapT, magFilter: source.magFilter, minFilter: source.minFilter, anisotropy,
+    format: source.format, internalFormat: source.internalFormat, type: source.type,
+    generateMipmaps: source.generateMipmaps, premultiplyAlpha: source.premultiplyAlpha,
+    flipY: source.flipY, unpackAlignment: source.unpackAlignment, colorSpace: source.colorSpace,
+    rotation: source.rotation, matrixAutoUpdate: source.matrixAutoUpdate,
+  });
+  tex.offset.copy(source.offset);
+  tex.repeat.copy(source.repeat);
+  tex.center.copy(source.center);
+  tex.matrix.copy(source.matrix);
+  return tex;
+}
+
 function prepare(source: THREE.Texture, repeatX: number, repeatY: number, anisotropy: number): THREE.Texture {
-  const tex = source.clone();
+  const tex = textureView(source, anisotropy);
   tex.wrapS = THREE.MirroredRepeatWrapping;
   tex.wrapT = THREE.MirroredRepeatWrapping;
   tex.repeat.set(repeatX, repeatY);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = anisotropy;
-  tex.needsUpdate = true;
   return tex;
 }
 
+// Only nine leather images and two invariant drawings; templates are never rendered, their owned views are disposed.
+const spineTemplates = new WeakMap<THREE.Texture["source"], THREE.Texture>();
+let giltTemplate: THREE.Texture | undefined;
+let pagesTemplate: THREE.Texture | undefined;
+
 function makeSpineTexture(leather: THREE.Texture, anisotropy: number): THREE.Texture {
+  const known = spineTemplates.get(leather.source);
+  if (known) return textureView(known, anisotropy);
   const W = 256;
   const H = 512;
   const [canvas, ctx] = createCanvas(W, H);
@@ -164,10 +189,13 @@ function makeSpineTexture(leather: THREE.Texture, anisotropy: number): THREE.Tex
   [58, 88, 244, 400, 440].forEach((y) => ctx.fillRect(0, y, W, 5));
   ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
   [63, 93, 249, 405, 445].forEach((y) => ctx.fillRect(0, y, W, 2));
-  return canvasTexture(canvas, anisotropy);
+  const template = canvasTexture(canvas, anisotropy);
+  spineTemplates.set(leather.source, template);
+  return textureView(template, anisotropy);
 }
 
 function makeGiltTexture(anisotropy: number): THREE.Texture {
+  if (giltTemplate) return textureView(giltTemplate, anisotropy);
   const W = 256;
   const H = 512;
   const [canvas, ctx] = createCanvas(W, H);
@@ -198,10 +226,12 @@ function makeGiltTexture(anisotropy: number): THREE.Texture {
   ctx.lineTo(W / 2 - 14, 352);
   ctx.closePath();
   ctx.stroke();
-  return canvasTexture(canvas, anisotropy);
+  giltTemplate = canvasTexture(canvas, anisotropy);
+  return textureView(giltTemplate, anisotropy);
 }
 
 function makePagesTexture(anisotropy: number): THREE.Texture {
+  if (pagesTemplate) return textureView(pagesTemplate, anisotropy);
   const [canvas, ctx] = createCanvas(64, 256);
   ctx.fillStyle = "#e9dcc0";
   ctx.fillRect(0, 0, 64, 256);
@@ -213,7 +243,8 @@ function makePagesTexture(anisotropy: number): THREE.Texture {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(1, 4);
-  return tex;
+  pagesTemplate = tex;
+  return textureView(pagesTemplate, anisotropy);
 }
 
 /** Warm the very dark or very bright variants so every gallery keeps the same gloom. */
@@ -244,7 +275,9 @@ export function LibraryMaterialsProvider({ seed = 0, children }: { seed?: number
   const gl = useThree((s) => s.gl);
   const plan = useMemo(() => planGallery(seed), [seed]);
   const urls = useMemo(() => planTextureUrls(plan), [plan]);
-  const loaded = useTexture(urls);
+  // Loader keys include the whole URL list; reuse the preloader's set instead of caching every gallery combination.
+  const all = useTexture(ALL_TEXTURE_URLS);
+  const loaded = useMemo(() => urls.map((url) => all[ALL_TEXTURE_URLS.indexOf(url)]), [all, urls]);
   const raw = useMemo(
     () => ({
       floor: loaded[0],
@@ -372,6 +405,8 @@ export function LibraryMaterialsProvider({ seed = 0, children }: { seed?: number
         b.cover.dispose();
         b.spine.dispose();
       });
+      value.wood.map?.dispose();
+      value.woodDark.map?.dispose();
       Object.values(textures).forEach((t) => {
         if (Array.isArray(t)) t.forEach((x) => x.dispose());
         else t.dispose();

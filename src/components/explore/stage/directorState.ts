@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { sideAngle, sideYaw, viewpointForSide, type GallerySide } from "../geometry";
-import { galleryToWorld, galleryYaw } from "./deskFrame";
+import { sideAngle, sideYaw, viewpointForSide, wallSide } from "../geometry";
+import { galleryToWorld } from "./deskFrame";
 import { nearestYaw, type CameraShot, type WalkPose } from "./poses";
 import { reversed, type Timeline } from "./timeline";
 import type { BookAddress, StageView } from "./stageStore";
@@ -12,15 +12,15 @@ import type { Controller } from "./transitions";
  * without mounting a canvas.
  */
 
-/** A world is built around its address: the visitor starts in gallery A of level 0. */
-export const START = { level: 0, side: "a" } as const;
+/** A world is built around its address: the visitor starts in column 0 of level 0. */
+export const START = { level: 0, col: 0 } as const;
 
 /** A book on the stage, lying open on its desk or in the air (two during a neighbour swap). */
 export interface StagedBook {
   book: BookAddress;
   mode: "index" | "read";
   /**
-   * Wall (1..5) of the desk the book lies on or flies to or from: the desk across from its own wall when it is taken,
+   * Wall (1..4) of the desk the book lies on or flies to or from: the desk across from its own wall when it is taken,
    * but a neighbour from the next wall comes to the desk the reader is at.
    */
   desk: number;
@@ -58,8 +58,8 @@ export function sameController(a: Controller, b: Controller): boolean {
 
 /** Where a visitor who comes in by a wall's address stands: across the shaft from that wall, facing it. */
 export function acrossFromWall(wall: number): WalkPose {
-  const [x, y, z] = viewpointForSide(wall - 1);
-  return { position: galleryToWorld(START.level, START.side, { x, y, z }), yaw: sideYaw(wall - 1) + galleryYaw(START.side), pitch: -0.04 };
+  const [x, y, z] = viewpointForSide(wallSide(wall));
+  return { position: galleryToWorld(START.level, START.col, { x, y, z }), yaw: sideYaw(wallSide(wall)), pitch: -0.04 };
 }
 
 /** The book of a desk state, lying open on the desk of wall `desk`. */
@@ -83,12 +83,12 @@ export function flyingBooks(f: FlightEnds): StagedBook[] {
   return books;
 }
 
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-/** Horizontal world direction from wall 1..5 of a gallery into its room. */
-export function intoRoom(side: GallerySide, wall: number): THREE.Vector3 {
-  const a = sideAngle(wall - 1);
-  return new THREE.Vector3(-Math.cos(a), 0, -Math.sin(a)).applyAxisAngle(Y_AXIS, galleryYaw(side));
+
+/** Horizontal world direction from wall 1..4 of a gallery into its room. */
+export function intoRoom(wall: number): THREE.Vector3 {
+  const a = sideAngle(wallSide(wall));
+  return new THREE.Vector3(-Math.cos(a), 0, -Math.sin(a));
 }
 
 /** The yaw and pitch (rotation order "YXZ") a shot looks along, the yaw whole turns nearest `near`. */

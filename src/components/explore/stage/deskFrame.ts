@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ROOM, closeupForSide, facingCenterRotation, galleryCenter, galleryRotation, sideAngle, sideYaw, type GallerySide } from "../geometry";
+import { ROOM, closeupForSide, facingCenterRotation, galleryCenter, wallSide, sideAngle, sideYaw } from "../geometry";
 import { CASE, planBookcase, shelfPlankY } from "../bookcasePlan";
 import { CLOSED_CENTER, CLOSED_THICKNESS, COVER, HOME_POSITION, HOME_TARGET, READER_FOV, READER_NEAR } from "./bookSpace";
 import type { BookPose, CameraShot, WalkPose } from "./poses";
@@ -38,13 +38,13 @@ const ON_SHELF = new THREE.Quaternion().setFromRotationMatrix(
 );
 const scratch = { scale: new THREE.Vector3(), origin: new THREE.Vector3() };
 
-/** Unit vector (gallery-local, horizontal) from the centre of a gallery towards wall 1..5. */
+/** Unit vector (gallery-local, horizontal) from the centre of a gallery towards wall 1..4. */
 function towardsWall(wall: number): { x: number; z: number } {
-  const a = sideAngle(wall - 1);
+  const a = sideAngle(wallSide(wall));
   return { x: Math.cos(a), z: Math.sin(a) };
 }
 
-/** Yaw of the book space of the desk facing wall 1..5 in an unturned gallery: book +z points at the wall. */
+/** Yaw of the book space of the desk facing wall 1..4 in an unturned gallery: book +z points at the wall. */
 function deskYaw(wall: number): number {
   const u = towardsWall(wall);
   return Math.atan2(u.x, u.z);
@@ -58,7 +58,7 @@ function turnY(v: THREE.Vector3Like, angle: number, out: THREE.Vector3): THREE.V
   return out.set(x * cos + z * sin, y, z * cos - x * sin);
 }
 
-/** Centre of the top of the desk that faces wall 1..5 across the shaft, gallery-local (floor at y = 0). */
+/** Centre of the top of the desk that faces wall 1..4 across the shaft, gallery-local (floor at y = 0). */
 export function deskCenterLocal(wall: number): THREE.Vector3 {
   const u = towardsWall(wall);
   const r = RAIL_APOTHEM + DESK.depth / 2;
@@ -84,23 +84,17 @@ export function deskLampLocal(wall: number): THREE.Vector3 {
   return turnY(LAMP_ON_DESK, deskYaw(wall), new THREE.Vector3()).add(deskCenterLocal(wall));
 }
 
-/** How far a gallery is turned: a gallery-local yaw plus this is a world yaw. */
-export function galleryYaw(side: GallerySide): number {
-  return galleryRotation(side);
+/** A gallery-local point of the gallery at (level, col), in the world. */
+export function galleryToWorld(level: number, col: number, p: THREE.Vector3Like, out = new THREE.Vector3()): THREE.Vector3 {
+  const [cx, cy, cz] = galleryCenter(col, level);
+  return out.set(p.x + cx, p.y + cy, p.z + cz);
 }
 
-/** A gallery-local point of the gallery at (level, side), in the world. */
-export function galleryToWorld(level: number, side: GallerySide, p: THREE.Vector3Like, out = new THREE.Vector3()): THREE.Vector3 {
-  const [cx, cy, cz] = galleryCenter(side, level);
-  turnY(p, galleryYaw(side), out);
-  return out.set(out.x + cx, out.y + cy, out.z + cz);
-}
-
-/** The book space of the desk facing wall 1..5 in the gallery at (level, side): book +z points at the wall. */
-export function deskFrame(level: number, side: GallerySide, wall: number): DeskFrame {
+/** The book space of the desk facing wall 1..4 in the gallery at (level, col): book +z points at the wall. */
+export function deskFrame(level: number, col: number, wall: number): DeskFrame {
   return {
-    position: galleryToWorld(level, side, deskCenterLocal(wall)),
-    yaw: deskYaw(wall) + galleryYaw(side),
+    position: galleryToWorld(level, col, deskCenterLocal(wall)),
+    yaw: deskYaw(wall),
     scale: BOOK_SCALE,
   };
 }
@@ -146,11 +140,11 @@ export function deskWatchShot(frame: DeskFrame, fov: number): CameraShot {
   };
 }
 
-/** A visitor standing at the desk of wall 1..5, between it and the shelves, looking at them. */
-export function visitorAtDesk(level: number, side: GallerySide, wall: number): WalkPose {
+/** A visitor standing at the desk of wall 1..4, between it and the shelves, looking at them. */
+export function visitorAtDesk(level: number, col: number, wall: number): WalkPose {
   const u = towardsWall(wall);
   const eye = new THREE.Vector3(u.x * VISITOR_RADIUS, ROOM.eyeHeight, u.z * VISITOR_RADIUS);
-  return { position: galleryToWorld(level, side, eye, eye), yaw: sideYaw(wall - 1) + galleryYaw(side), pitch: -0.04 };
+  return { position: galleryToWorld(level, col, eye, eye), yaw: sideYaw(wallSide(wall)), pitch: -0.04 };
 }
 
 /** The camera of a visitor: looking along yaw and pitch (rotation order "YXZ"), a metre ahead. */
@@ -161,13 +155,13 @@ export function walkShot(pose: WalkPose, fov: number): CameraShot {
 }
 
 /** The close-up of a shelf, hanging over the shaft: the eye as high as its volumes (within 1.05..2.45 m), facing the wall. */
-export function closeupPose(level: number, side: GallerySide, wall: number, shelf: number): { pose: WalkPose; yawRange: [number, number] } {
+export function closeupPose(level: number, col: number, wall: number, shelf: number): { pose: WalkPose; yawRange: [number, number] } {
   const bookY = shelfPlankY(shelf) + CASE.shelfThickness / 2 + CASE.bookH / 2;
   const eye = THREE.MathUtils.clamp(bookY, 1.05, 2.45);
-  const [x, , z] = closeupForSide(wall - 1, CLOSEUP_DISTANCE);
-  const yaw = sideYaw(wall - 1) + galleryYaw(side);
+  const [x, , z] = closeupForSide(wallSide(wall), CLOSEUP_DISTANCE);
+  const yaw = sideYaw(wallSide(wall));
   return {
-    pose: { position: galleryToWorld(level, side, { x, y: eye, z }), yaw, pitch: Math.atan2(bookY - eye, CLOSEUP_DISTANCE) },
+    pose: { position: galleryToWorld(level, col, { x, y: eye, z }), yaw, pitch: Math.atan2(bookY - eye, CLOSEUP_DISTANCE) },
     yawRange: [yaw - CLOSEUP_YAW, yaw + CLOSEUP_YAW],
   };
 }
@@ -176,17 +170,13 @@ export function closeupPose(level: number, side: GallerySide, wall: number, shel
  * A closed book standing in the place of a volume on its shelf. The volume is thicker and deeper than
  * the closed desk book, so the pose carries a correction scale that makes the book fill its box.
  */
-export function shelfBookPose(level: number, side: GallerySide, wall: number, shelf: number, volume: number, seed: number): BookPose {
+export function shelfBookPose(level: number, col: number, wall: number, shelf: number, volume: number, seed: number): BookPose {
   const { x, y, z, scaleY } = planBookcase(seed, wall).placements.find((b) => b.shelf === shelf && b.volume === volume)!;
-  const u = towardsWall(wall);
-  const caseYaw = facingCenterRotation(sideAngle(wall - 1));
-  // The centre of the closed book is the centre of the volume's box: bookcase → gallery → world.
-  const center = turnY({ x, y, z }, caseYaw, new THREE.Vector3());
-  center.x += u.x * BOOKCASE_RADIUS;
-  center.z += u.z * BOOKCASE_RADIUS;
+  const caseYaw = bookcaseYaw(wall);
+  const center = bookcaseToWorld(level, col, wall, { x, y, z });
   return {
-    position: galleryToWorld(level, side, center, center),
-    quaternion: new THREE.Quaternion().setFromAxisAngle(Y_AXIS, galleryYaw(side) + caseYaw).multiply(ON_SHELF),
+    position: center,
+    quaternion: new THREE.Quaternion().setFromAxisAngle(Y_AXIS, caseYaw).multiply(ON_SHELF),
     scale: new THREE.Vector3(
       CASE.bookD / ((COVER.w / 2) * BOOK_SCALE),
       CASE.bookW / (CLOSED_THICKNESS * BOOK_SCALE),
@@ -209,4 +199,16 @@ export function bookMatrix(pose: BookPose, out = new THREE.Matrix4()): THREE.Mat
   const scale = scratch.scale.copy(pose.scale).multiplyScalar(BOOK_SCALE);
   const origin = scratch.origin.copy(CLOSED_CENTER).multiply(scale).applyQuaternion(pose.quaternion);
   return out.compose(origin.subVectors(pose.position, origin), pose.quaternion, scale);
+}
+
+/** rotation.y of the bookcase of wall 1..4: its local +z faces the room. */
+export const bookcaseYaw = (wall: number): number => facingCenterRotation(sideAngle(wallSide(wall)));
+
+/** A point in the frame of the bookcase of wall 1..4 (as Bookcase draws it) of the gallery at (level, col), in the world. */
+export function bookcaseToWorld(level: number, col: number, wall: number, p: THREE.Vector3Like, out = new THREE.Vector3()): THREE.Vector3 {
+  const u = towardsWall(wall);
+  turnY(p, bookcaseYaw(wall), out);
+  out.x += u.x * BOOKCASE_RADIUS;
+  out.z += u.z * BOOKCASE_RADIUS;
+  return galleryToWorld(level, col, out, out);
 }

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-/** The hexagonal gallery, in metres. Wall i (0..4) carries shelves, side 5 is the doorway. */
+/** The hexagonal gallery, in metres. Sides 0, 1, 3, 4 carry shelves (walls 1..4); sides 2 and 5 are doorways. */
 export const ROOM = {
   radius: 4,
   apothem: 4 * Math.cos(Math.PI / 6),
@@ -21,7 +21,17 @@ export const ROOM = {
   levelsAbove: 4,
 } as const;
 
-export const DOOR_INDEX = 5;
+/** The doorways: side 5 leads east to the next gallery of the row, side 2 west to the one before. */
+export const EAST_DOOR = 5;
+export const WEST_DOOR = 2;
+export const DOOR_SIDES = [WEST_DOOR, EAST_DOOR] as const;
+/** Side of each wall of shelves: wall n (1..4) stands on side WALL_SIDES[n − 1]. */
+export const WALL_SIDES = [0, 1, 3, 4] as const;
+
+export const wallSide = (wall: number): number => WALL_SIDES[wall - 1];
+
+/** Wall (1..4) standing on side 0..5, 0 for a doorway. */
+export const sideWall = (side: number): number => (WALL_SIDES as readonly number[]).indexOf(side) + 1;
 
 const STEPS_PER_LEVEL = 16;
 
@@ -48,45 +58,40 @@ export const STAIR = {
 export const sideAngle = (i: number) => (i * Math.PI) / 3 + Math.PI / 6;
 
 /**
- * Two galleries share one vestibule: gallery B stands beyond the far door of gallery A, turned to
- * face it. The pairs repeat on every level and the spiral stair of the vestibule connects them,
- * so the world is an endless ladder of gallery pairs.
+ * The galleries of a floor stand in a row, door to door, a vestibule (closets, mirror, spiral stair) between each one
+ * and the next; the rows repeat on every floor. `col` counts galleries along the row from the world's own, east +1.
  */
-export const PAIR = {
-  /** Distance between the centres of the two galleries of a pair. */
-  distance: 2 * ROOM.apothem + ROOM.vestibuleDepth,
-  /** Unit vector from the centre of A through its doorway (towards B). */
-  nx: Math.cos(sideAngle(DOOR_INDEX)),
-  nz: Math.sin(sideAngle(DOOR_INDEX)),
-  /** Lateral unit vector across the doorway (local +x of A). */
-  tx: -Math.sin(sideAngle(DOOR_INDEX)),
-  tz: Math.cos(sideAngle(DOOR_INDEX)),
+export const ROW = {
+  /** Distance between the centres of two neighbouring galleries. */
+  period: 2 * ROOM.apothem + ROOM.vestibuleDepth,
+  /** Unit vector from the centre of a gallery through its east doorway. */
+  nx: Math.cos(sideAngle(EAST_DOOR)),
+  nz: Math.sin(sideAngle(EAST_DOOR)),
+  /** Lateral unit vector across the doorways. */
+  tx: -Math.sin(sideAngle(EAST_DOOR)),
+  tz: Math.cos(sideAngle(EAST_DOOR)),
 } as const;
-
-export type GallerySide = "a" | "b";
 
 export interface WorldCell {
   level: number;
-  /** "v" while in the vestibule between the two galleries. */
-  side: GallerySide | "v";
+  col: number;
+  /** True in the vestibule east of gallery `col`. */
+  vestibule: boolean;
 }
 
-/** World position of the centre of a gallery. */
-export function galleryCenter(side: GallerySide, level: number): [number, number, number] {
-  const y = level * ROOM.level;
-  return side === "a" ? [0, y, 0] : [PAIR.nx * PAIR.distance, y, PAIR.nz * PAIR.distance];
+/** World position of the centre of a gallery. Every gallery faces the same way. */
+export function galleryCenter(col: number, level: number): [number, number, number] {
+  return [ROW.nx * ROW.period * col, level * ROOM.level, ROW.nz * ROW.period * col];
 }
 
-/** rotation.y of a gallery: B is A turned half a circle, so its doorway faces back through the vestibule. */
-export function galleryRotation(side: GallerySide): number {
-  return side === "a" ? 0 : Math.PI;
-}
+/** Distance along the row from the west doorway of gallery 0. */
+const rowDistance = (p: THREE.Vector3Like) => p.x * ROW.nx + p.z * ROW.nz + ROOM.apothem;
 
-/** Which cell of the world a feet position is in. Levels switch while the eyes pass through the floor slab. */
+/** Which gallery (or the vestibule east of it) a feet position is in. Levels switch while the eyes pass through the slab. */
 export function cellAt(feet: THREE.Vector3Like): WorldCell {
-  const t = feet.x * PAIR.nx + feet.z * PAIR.nz - ROOM.apothem;
-  const level = Math.round(feet.y / ROOM.level);
-  return { level, side: t < 0 ? "a" : t > ROOM.vestibuleDepth ? "b" : "v" };
+  const s = rowDistance(feet);
+  const col = Math.floor(s / ROW.period);
+  return { level: Math.round(feet.y / ROOM.level), col, vestibule: s - col * ROW.period > 2 * ROOM.apothem };
 }
 
 /**
@@ -193,7 +198,7 @@ const scratch = { x: 0, z: 0 };
 /** Keeps a point inside the room of an (unrotated) gallery centred at the origin, off the shaft. */
 function clampRoom(p: { x: number; z: number }, lateral: number) {
   for (let i = 0; i < 6; i++) {
-    if (i === DOOR_INDEX && Math.abs(lateral) < LANE_HALF) continue;
+    if ((i === EAST_DOOR || i === WEST_DOOR) && Math.abs(lateral) < LANE_HALF) continue;
     const a = sideAngle(i);
     const wx = Math.cos(a);
     const wz = Math.sin(a);
@@ -218,35 +223,32 @@ function clampRoom(p: { x: number; z: number }, lateral: number) {
 }
 
 /**
- * Keeps a walker inside the two galleries of a pair, their shared vestibule and on the spiral
- * staircase, on any level. feet is the proposed feet position (mutated in place), from the last
- * accepted one. Returns the height of the floor or tread under the feet.
+ * Keeps a walker inside the galleries of the rows, the vestibules between them and on their spiral staircases, on any
+ * level. feet is the proposed feet position (mutated in place), from the last accepted one. Returns the height of the
+ * floor or tread under the feet.
  */
 export function constrainWalk(feet: THREE.Vector3, from: THREE.Vector3): number {
-  const { nx, nz, tx, tz, distance } = PAIR;
+  const { nx, nz, tx, tz, period } = ROW;
   const depth = ROOM.vestibuleDepth;
   const levelFloor = Math.round(feet.y / ROOM.level) * ROOM.level;
-  // Corridor coordinates: t is the depth beyond the doorway wall of A, l the lateral offset.
-  let t = feet.x * nx + feet.z * nz - ROOM.apothem;
+  const col = Math.floor(rowDistance(feet) / period);
+  const cx = nx * period * col;
+  const cz = nz * period * col;
+  // Corridor coordinates of the vestibule east of `col`: t is the depth beyond its doorway, l the lateral offset.
+  const corridor = (p: THREE.Vector3Like) => rowDistance(p) - col * period - 2 * ROOM.apothem;
+  let t = corridor(feet);
   let l = feet.x * tx + feet.z * tz;
 
   if (t < -0.1) {
-    clampRoom(feet, l);
-    return levelFloor;
-  }
-  if (t > depth + 0.1) {
-    // Gallery B is A turned half a circle about its own centre.
-    const bx = nx * distance;
-    const bz = nz * distance;
-    scratch.x = bx - feet.x;
-    scratch.z = bz - feet.z;
-    clampRoom(scratch, scratch.x * tx + scratch.z * tz);
-    feet.x = bx - scratch.x;
-    feet.z = bz - scratch.z;
+    scratch.x = feet.x - cx;
+    scratch.z = feet.z - cz;
+    clampRoom(scratch, l);
+    feet.x = cx + scratch.x;
+    feet.z = cz + scratch.z;
     return levelFloor;
   }
 
-  // The vestibule between the two doorways.
+  // The vestibule, up to the west doorway of the next gallery.
   const nearDoor = t < 0.25 || t > depth - 0.25;
   const maxL = nearDoor ? LANE_HALF : VESTIBULE_HALF;
   l = THREE.MathUtils.clamp(l, -maxL, maxL);
@@ -257,7 +259,7 @@ export function constrainWalk(feet: THREE.Vector3, from: THREE.Vector3): number 
   const dt = t - wellT;
   const dist = Math.hypot(dl, dt);
   const phi = Math.atan2(-dt, dl);
-  const fromT = from.x * nx + from.z * nz - ROOM.apothem;
+  const fromT = corridor(from);
   const fromL = from.x * tx + from.z * tz;
   const wasInWell = Math.hypot(fromL - STAIR.x, fromT - wellT) < STAIR.wellRadius;
   const inWell = dist < STAIR.wellRadius;
@@ -287,7 +289,22 @@ export function constrainWalk(feet: THREE.Vector3, from: THREE.Vector3): number 
     ground = stairHeightAt(phi, feet.y);
   }
 
-  feet.x = nx * (ROOM.apothem + t) + tx * l;
-  feet.z = nz * (ROOM.apothem + t) + tz * l;
+  feet.x = cx + nx * (ROOM.apothem + t) + tx * l;
+  feet.z = cz + nz * (ROOM.apothem + t) + tz * l;
   return ground;
+}
+
+/** Position (world) and rotation.y of the vestibule east of gallery `col` on a level. */
+export function vestibuleFrame(col: number, level: number): { position: [number, number, number]; rotation: number } {
+  const a = sideAngle(EAST_DOOR);
+  const [cx, cy, cz] = galleryCenter(col, level);
+  return { position: [cx + Math.cos(a) * ROOM.apothem, cy, cz + Math.sin(a) * ROOM.apothem], rotation: facingCenterRotation(a) };
+}
+
+/** World position of a point given in the frame of the vestibule east of `col`. */
+export function vestibulePoint(col: number, level: number, x: number, y: number, z: number): [number, number, number] {
+  const { position, rotation } = vestibuleFrame(col, level);
+  const c = Math.cos(rotation);
+  const s = Math.sin(rotation);
+  return [position[0] + x * c + z * s, position[1] + y, position[2] - x * s + z * c];
 }

@@ -7,7 +7,8 @@ import { useTranslations } from "next-intl";
 import { LIBRARY } from "@/lib/library";
 import { useLibraryMaterials } from "./materials";
 import { CASE, planBookcase, shelfPlankY, type BookPlacement, type BookRef } from "./bookcasePlan";
-import { canvasTexture, createCanvas, loadSerifFont, makePlaqueTexture } from "./textTexture";
+import { canvasTexture, createCanvas, loadSerifFont } from "./textTexture";
+import { usePlaqueMaterials } from "./plaqueMaterials";
 import { setCanvasCursor } from "./cursor";
 
 export { CASE, shelfPlankY, type BookRef } from "./bookcasePlan";
@@ -221,35 +222,7 @@ export default function Bookcase({
   }, [gl]);
 
   /* ── Plaques ── */
-  const plaques = useMemo(() => {
-    if (!family) return null;
-    const wallPlaque = makePlaqueTexture(wallLabel, family, { width: 640, height: 96, fontSize: 52, letterSpacing: 6 });
-    const shelfPlaques = Array.from({ length: LIBRARY.shelves }, (_, i) =>
-      makePlaqueTexture(`${i + 1}`, family, { width: 160, height: 96, fontSize: 60, letterSpacing: 0 })
-    );
-    return { wallPlaque, shelfPlaques };
-  }, [family, wallLabel]);
-
-  useEffect(() => {
-    return () => {
-      plaques?.wallPlaque.dispose();
-      plaques?.shelfPlaques.forEach((t) => t.dispose());
-    };
-  }, [plaques]);
-
-  const plaqueMaterials = useMemo(() => {
-    if (!plaques) return null;
-    const make = (map: THREE.Texture) =>
-      new THREE.MeshStandardMaterial({ map, roughness: 0.4, metalness: 0.5, emissive: new THREE.Color("#3a2a10"), emissiveIntensity: 0.4 });
-    return { wall: make(plaques.wallPlaque), shelves: plaques.shelfPlaques.map(make) };
-  }, [plaques]);
-
-  useEffect(() => {
-    return () => {
-      plaqueMaterials?.wall.dispose();
-      plaqueMaterials?.shelves.forEach((m) => m.dispose());
-    };
-  }, [plaqueMaterials]);
+  const plaqueMaterials = usePlaqueMaterials(family, wallLabel);
 
   /* ── Detailed (titled) volumes for the close-up shelf; the one taken off it (if any) is left out ── */
   const detailBooks = useMemo(() => {

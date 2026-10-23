@@ -2,7 +2,7 @@ import { ALPHABETS } from "./alphabet";
 
 /** Physical layout of this Library — shared by the API, the pages and the 3D scenes. */
 export const LIBRARY = {
-  walls: 5,
+  walls: 4,
   shelves: 7,
   volumes: 31,
   pages: 421,
