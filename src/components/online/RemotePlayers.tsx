@@ -62,7 +62,8 @@ function Avatar({ player }: { player: Player }) {
     return () => made.forEach((m) => m.dispose());
   }, [model, player.color]);
 
-  useEffect(() => () => { mixer.stopAllAction(); mixer.uncacheRoot(model); }, [mixer, model]);
+  // Effect cleanup can replay while cached actions are still used; the per-avatar mixer is garbage-collected on unmount.
+  useEffect(() => () => { mixer.stopAllAction(); playing.current = null; }, [mixer]);
 
   useFrame(({ camera }, dt) => {
     const g = group.current;
