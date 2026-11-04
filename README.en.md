@@ -37,9 +37,9 @@ The Library speaks **two languages**. The `RU | EN` switch in the header changes
 
 ## Online demo
 
-[![Watch the project demo: players, chat, shared map and book highlights](docs/screenshots/online-demo.jpg)](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)
+https://github.com/user-attachments/assets/2654fba6-6eb8-42eb-9dac-582f52369a41
 
-**[▶ Watch the demo · 2:36 · Full HD · 30 fps](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)**
+**2:36 · Full HD · 30 fps** · [Download the original](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)
 
 Live players, chat, a shared map and notes. Saved highlights appear for everyone reading the same book; colour changes arrive instantly, and chat links take readers straight to a discovery. The demo uses the Russian interface.
 

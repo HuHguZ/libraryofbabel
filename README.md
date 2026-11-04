@@ -40,9 +40,9 @@
 
 ## Демо онлайна
 
-[![Смотреть демо проекта: игроки, чат, общая карта и метки в книгах](docs/screenshots/online-demo.jpg)](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)
+https://github.com/user-attachments/assets/2654fba6-6eb8-42eb-9dac-582f52369a41
 
-**[▶ Смотреть демо · 2:36 · Full HD · 30 fps](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)**
+**2:36 · Full HD · 30 fps** · [Скачать оригинал](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)
 
 Живые игроки, чат, общая карта и заметки. Сохранённые метки видны всем читателям той же книги; цвет меняется сразу у всех, а из чата можно перейти прямо к находке.
 
