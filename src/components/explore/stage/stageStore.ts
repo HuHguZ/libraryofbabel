@@ -1,6 +1,7 @@
 import type { WalkPose } from "./poses";
 import type { BookRef } from "../Bookcase";
 import type { WorldPlace } from "../HexGalleryScene";
+import type { ColoredFragment } from "@/lib/fragment";
 
 export interface BookAddress {
   hex: string;
@@ -25,6 +26,7 @@ export interface DeskInputs {
   matchStep?: number;
   mark?: { page: number; start: number; end: number } | null;
   markColor?: string;
+  highlights?: ColoredFragment[];
   markFocusToken?: string;
   loupe: boolean;
 }
@@ -122,6 +124,7 @@ const sameDesk = (a: DeskInputs | null, b: DeskInputs): boolean =>
   Object.is(a.focusToken, b.focusToken) &&
   Object.is(a.matchStep, b.matchStep) &&
   Object.is(a.markColor, b.markColor) &&
+  Object.is(a.highlights, b.highlights) &&
   Object.is(a.markFocusToken, b.markFocusToken) &&
   Object.is(a.loupe, b.loupe);
 

@@ -137,7 +137,7 @@ interface PageTex {
  * camera logic converts between the two through `frame`.
  */
 export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, interactive, motion, orbitRef, spineTitle, shown: isShown = true }: DeskBookProps) {
-  const { title, spread, contents, query, focusToken, currentMatch, matchStep, mark, markColor, markFocusToken } = inputs;
+  const { title, spread, contents, query, focusToken, currentMatch, matchStep, mark, markColor, highlights, markFocusToken } = inputs;
   const store = useStageStore();
   const titleText = useTitlePageText(title, book.wall, book.shelf, book.volume);
   const bookText = useTranslations("Book");
@@ -202,9 +202,9 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
   const blank = useMemo(() => makeBlankPage(materials.textures.parchment), [materials]);
   useEffect(() => () => blank.dispose(), [blank]);
 
-  const drawn = useRef({ family, contents, query, currentMatch, mark, markColor, title, titleText, indexText, parchment: materials.textures.parchment });
+  const drawn = useRef({ family, contents, query, currentMatch, mark, markColor, highlights, title, titleText, indexText, parchment: materials.textures.parchment });
   useLayoutEffect(() => {
-    drawn.current = { family, contents, query, currentMatch, mark, markColor, title, titleText, indexText, parchment: materials.textures.parchment };
+    drawn.current = { family, contents, query, currentMatch, mark, markColor, highlights, title, titleText, indexText, parchment: materials.textures.parchment };
   });
 
   const cache = useRef(new Map<number, PageTex>());
@@ -230,12 +230,12 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
 
   /** What a page looks like right now, or null while it cannot be drawn yet (no font or no text). */
   const pageKey = (page: number): string | null => {
-    const { family: f, contents: c, query: q, currentMatch: cm, mark: m, markColor: mc, title: tl, titleText: tt } = drawn.current;
+    const { family: f, contents: c, query: q, currentMatch: cm, mark: m, markColor: mc, highlights: hs, title: tl, titleText: tt } = drawn.current;
     if (!f || page < 0 || page > LIBRARY.pages) return null;
     if (page === 0) return `title|${tl}|${tt.library}|${tt.untitled}|${tt.volume}|${tt.location}|${tt.epigraph}`;
     if (c[page] === undefined) return null;
     // Only the pages carrying the mark or the current occurrence are redrawn when those move.
-    return `${q}|${tl}|${tt.untitled}|${m?.page === page ? `${m.start}-${m.end}-${mc}` : ""}|${cm?.page === page ? cm.start : ""}`;
+    return `${q}|${tl}|${tt.untitled}|${m?.page === page ? `${m.start}-${m.end}-${mc}` : ""}|${cm?.page === page ? cm.start : ""}|${(hs ?? []).filter(h => h.page === page).map(h => `${h.start}-${h.end}-${h.color}`).join(",")}`;
   };
 
   /**
@@ -252,7 +252,7 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
 
   /** Starts a page on its own canvas: the paper, its head and highlights. `carryOn` writes its text and takes it in. */
   const drawPage = (page: number, key: string): void => {
-    const { family: f, contents: c, query: q, currentMatch: cm, mark: m, markColor: mc, title: tl, titleText: tt, parchment } = drawn.current;
+    const { family: f, contents: c, query: q, currentMatch: cm, mark: m, markColor: mc, highlights: hs, title: tl, titleText: tt, parchment } = drawn.current;
     const started: { tex: PageTex; writing: ((lines: number) => boolean) | null } =
       page === 0
         ? { tex: { key, texture: makeTitlePage(f!, parchment, tt), first: null, current: null, mark: null }, writing: null }
@@ -266,6 +266,7 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
               query: q,
               mark: m?.page === page ? m : null,
               markColor: mc,
+              highlights: hs?.filter(h => h.page === page),
               current: cm?.page === page ? cm.start : null,
             });
             return { tex: { key, texture: r.texture, first: r.firstMatch, current: r.currentMatch, mark: r.markCenter }, writing: r.writeLines };

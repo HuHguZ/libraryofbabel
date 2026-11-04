@@ -7,7 +7,7 @@ import messages from "../../../messages/ru.json";
 import { system } from "@/lib/theme";
 import { LIBRARY } from "@/lib/library";
 import { PAGE_TEXT_ATTR, fragmentFromSelection, fragmentReducer, shownFragment, type FragmentState, type TextFragment } from "@/lib/fragment";
-import ReaderTextPanel from "./ReaderTextPanel";
+import ReaderTextPanel, { type ReaderTextPanelProps } from "./ReaderTextPanel";
 
 // Links need the Next.js router; the panel's selection handling does not.
 vi.mock("@/components/LibraryNav", () => ({ default: () => null }));
@@ -25,7 +25,7 @@ const contents = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i + 1,
  * page turns. `settleOnTurn` is what the page does on a turn; without it, only the panel itself can notice
  * that the selected text went away.
  */
-function Reader({ settleOnTurn, spy }: { settleOnTurn: boolean; spy: { state: FragmentState } }) {
+function Reader({ settleOnTurn, spy, panelProps }: { settleOnTurn: boolean; spy: { state: FragmentState }; panelProps?: Partial<ReaderTextPanelProps> }) {
   const [spread, setSpread] = useState(4);
   const [state, dispatch] = useReducer(fragmentReducer, { mark: null, live: null });
   spy.state = state;
@@ -59,17 +59,18 @@ function Reader({ settleOnTurn, spy }: { settleOnTurn: boolean; spy: { state: Fr
         onShow={() => {}}
         onClear={() => dispatch({ type: "clear" })}
         onClose={() => {}}
+        {...panelProps}
       />
     </>
   );
 }
 
-function renderReader(settleOnTurn: boolean) {
+function renderReader(settleOnTurn: boolean, panelProps?: Partial<ReaderTextPanelProps>) {
   const spy = { state: { mark: null, live: null } as FragmentState };
   render(
     <NextIntlClientProvider locale="ru" messages={messages}>
       <ChakraProvider value={system}>
-        <Reader settleOnTurn={settleOnTurn} spy={spy} />
+        <Reader settleOnTurn={settleOnTurn} spy={spy} panelProps={panelProps} />
       </ChakraProvider>
     </NextIntlClientProvider>
   );
@@ -126,6 +127,28 @@ describe("ReaderTextPanel selection", () => {
     selectText(9, 100, 180);
     expect(spy.state).toEqual({ mark: null, live: { page: 9, start: 100, end: 180 } });
     expect(panelShows(spy.state)).toEqual(shownFragment(spy.state));
+  });
+
+  it("only saves a draft on the explicit save button", () => {
+    const onSave = vi.fn();
+    renderReader(true, { onSave });
+    selectText(9, 100, 180);
+    expect(onSave).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
+    expect(onSave).toHaveBeenCalledOnce();
+  });
+
+  it("shows a foreign mark in its stored colour and offers chat without edit controls", () => {
+    const anchor = { wall: 1, shelf: 3, volume: 18, page: 9, start: 100, end: 180 };
+    const note = { id: 5, cell: "0:0", anchor, author: "other", nick: "Автор", text: "", color: "#abcdef", highlightColor: "#b02e3a", at: "" };
+    const onChat = vi.fn();
+    renderReader(true, { fragment: anchor, notes: [note], savedNote: note, canEdit: false, onChat, onDelete: vi.fn() });
+    expect(document.querySelector("mark[data-saved-colors]")?.getAttribute("data-saved-colors")).toBe("#b02e3a");
+    expect(screen.queryByRole("button", { name: "Сохранить метку" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Удалить метку" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Цвет выделения — нажмите, чтобы выбрать другой" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "В чат" }));
+    expect(onChat).toHaveBeenCalledOnce();
   });
 
   // Regression: select text, turn the page, turn back. The 3D book kept the highlight, the panel lost it.

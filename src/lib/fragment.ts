@@ -7,6 +7,8 @@ export interface TextFragment {
   end: number;
 }
 
+export interface ColoredFragment extends TextFragment { color: string }
+
 const FRAGMENT_PATTERN = /^(\d{1,9}):(\d{1,9})-(\d{1,9})$/;
 
 /**

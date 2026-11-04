@@ -35,19 +35,27 @@ export async function addFog(lang: string, chunk: string, bits: Uint8Array): Pro
     if (!updated.length) await transaction`insert into fog (lang, chunk, bits) values (${lang}, ${chunk}, ${fogToBitString(bits)}::bit(1024))`;
   });
 }
-type NoteRow = { id: string; chunk: string; cell: string; anchor: Anchor | null; text: string; author: string; nick: string; color: string; at: Date };
-const toNote = (row: NoteRow): Note => ({ id: Number(row.id), cell: row.cell, anchor: row.anchor, text: row.text, author: row.author, nick: row.nick, color: row.color, at: row.at.toISOString() });
-export async function addNote(lang: string, chunk: string, note: { cell: string; anchor: Anchor | null; text: string; author: string }): Promise<{ id: number; at: string }> {
-  const [row] = await sql<{ id: string; at: Date }[]>`insert into notes (lang, chunk, cell, anchor, text, author) values (${lang}, ${chunk}, ${note.cell}, ${note.anchor ? sql.json({ ...note.anchor }) : null}, ${note.text}, ${note.author}) returning id, created_at as at`;
+type NoteRow = { id: string; chunk: string; cell: string; anchor: Anchor | null; text: string; author: string; nick: string; color: string; highlight_color: string | null; at: Date };
+const toNote = (row: NoteRow): Note => ({ id: Number(row.id), cell: row.cell, anchor: row.anchor, text: row.text, author: row.author, nick: row.nick, color: row.color, ...(row.highlight_color && { highlightColor: row.highlight_color }), at: row.at.toISOString() });
+export async function addNote(lang: string, chunk: string, note: { cell: string; anchor: Anchor | null; text: string; author: string; highlightColor?: string }): Promise<{ id: number; at: string }> {
+  const [row] = await sql<{ id: string; at: Date }[]>`insert into notes (lang, chunk, cell, anchor, text, author, highlight_color) values (${lang}, ${chunk}, ${note.cell}, ${note.anchor ? sql.json({ ...note.anchor }) : null}, ${note.text}, ${note.author}, ${note.highlightColor ?? null}) returning id, created_at as at`;
   return { id: Number(row.id), at: row.at.toISOString() };
 }
 /** Notes are permanent; a chunk response contains every live note, newest first. */
 export async function notesIn(lang: string, chunks: string[]): Promise<Map<string, Note[]>> {
   const out = new Map<string, Note[]>();
   if (!chunks.length) return out;
-  const rows = await sql<NoteRow[]>`select n.id, n.chunk, n.cell, n.anchor, n.text, n.author, g.nick, g.color, n.created_at as at from notes n join guests g on g.id = n.author where n.lang = ${lang} and n.chunk in ${sql(chunks)} and not n.forgotten order by n.id desc`;
+  const rows = await sql<NoteRow[]>`select n.id, n.chunk, n.cell, n.anchor, n.text, n.author, n.highlight_color, g.nick, g.color, n.created_at as at from notes n join guests g on g.id = n.author where n.lang = ${lang} and n.chunk in ${sql(chunks)} and not n.forgotten order by n.id desc`;
   for (const row of rows) { const list = out.get(row.chunk) ?? []; list.push(toNote(row)); out.set(row.chunk, list); }
   return out;
+}
+export async function noteById(lang: string, id: number): Promise<Note | null> {
+  const [row] = await sql<NoteRow[]>`select n.*, g.nick, g.color, n.created_at as at from notes n join guests g on g.id = n.author where n.lang = ${lang} and n.id = ${id} and not n.forgotten`;
+  return row ? toNote(row) : null;
+}
+export async function paintNote(lang: string, id: number, author: string, color: string): Promise<boolean> {
+  const rows = await sql`update notes set highlight_color = ${color} where lang = ${lang} and id = ${id} and author = ${author} and anchor is not null and not forgotten returning id`;
+  return rows.length > 0;
 }
 export async function addMessage(lang: string, message: { author: string; text: string; place: SharedPlace | null }): Promise<{ id: number; at: string }> {
   return sql.begin(async transaction => {

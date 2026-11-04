@@ -33,14 +33,14 @@ export default function GalleryNotes({ cell }: { cell: Cell }) {
                 {t("onPage", { page: n.anchor.page })}
               </chakra.button>
             )}
-            {(n.author === you || admin) && (
+            {(n.author === you || (admin && !n.anchor)) && (
               <chakra.button ml="auto" color="dark.400" cursor="pointer" onClick={() => online.send({ type: "forget", kind: "note", id: n.id })}>
                 {t("forget")}
               </chakra.button>
             )}
           </Flex>
           <Text color="dark.50" wordBreak="break-word">
-            {n.text}
+            {n.text || (n.anchor ? t("highlight", { count: n.anchor.end - n.anchor.start }) : "")}
           </Text>
         </Box>
       ))}

@@ -15,7 +15,8 @@ it("shares the first readable spread as page one, reserving page zero for the in
 it("opens note and shared fragments on their own page", () => {
   const base = { id: 1, cell: "-3:7", text: "x", author: "a", nick: "a", color: "#b02e3a", at: "" };
   expect(noteHref({ ...base, anchor: null })).toBe(`/explore/wall/1?hex=${hex}`);
-  expect(noteHref({ ...base, anchor: { wall: 2, shelf: 3, volume: 4, page: 5, start: 6, end: 7 } })).toBe(`/page/${hex}-2-3-4-5?text=5:6-7`);
+  expect(noteHref({ ...base, anchor: { wall: 2, shelf: 3, volume: 4, page: 5, start: 6, end: 7 } })).toBe(`/page/${hex}-2-3-4-5?note=1`);
+  expect(sharedPlaceHref({ cell: "-3:7", view: { kind: "desk", wall: 2, shelf: 3, volume: 4, page: 4 }, fragment: { page: 5, start: 6, end: 7 }, note: 1 })).toBe(`/page/${hex}-2-3-4-5?note=1`);
   expect(sharedPlaceHref({ cell: "-3:7", view: { kind: "desk", wall: 2, shelf: 3, volume: 4, page: 4 }, fragment: { page: 5, start: 6, end: 7 } })).toBe(`/page/${hex}-2-3-4-5?text=5:6-7`);
 });
 

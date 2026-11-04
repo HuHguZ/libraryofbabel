@@ -9,7 +9,7 @@ import { Bans, canForget } from "./moderation";
 import { randomColor, randomNick } from "./nicks";
 import { World } from "./world";
 
-export type Storage = Pick<typeof db, "loadGuest" | "lastPlace" | "saveProfile" | "savePlace" | "loadFog" | "addFog" | "notesIn" | "recentMessages" | "addMessage" | "addNote" | "authorOf" | "forget" | "addBan">;
+export type Storage = Pick<typeof db, "loadGuest" | "lastPlace" | "saveProfile" | "savePlace" | "loadFog" | "addFog" | "notesIn" | "recentMessages" | "addMessage" | "addNote" | "noteById" | "paintNote" | "authorOf" | "forget" | "addBan">;
 type PendingPlace = { guest: string; lang: Locale; cell: string; wall: number };
 
 /** One process owns both worlds; the transport only supplies authenticated guest ids. */
@@ -62,7 +62,7 @@ export class Session {
     const snapshot = this.snapshot;
     const buffered = snapshot?.kind === "hello"
       ? message.type === "message" || (message.type === "forgotten" && message.kind === "chat")
-      : message.type === "noted" || (message.type === "forgotten" && message.kind === "note");
+      : message.type === "noted" || message.type === "painted" || (message.type === "forgotten" && message.kind === "note");
     if (snapshot?.lang === lang && buffered) {
       if (snapshot.events.length >= 1024) { this.disconnect(1013); this.close(); }
       else snapshot.events.push(message);
@@ -153,15 +153,33 @@ export class Session {
       return;
     }
     if (message.type === "note") {
-      if (!this.allowed("note")) return;
+      if (!this.allowed(message.highlightColor && !message.text ? "mark" : "note")) return;
       const chunk = chunkKeyOf(parseCellKey(message.cell)!);
-      const { id, at } = await database.addNote(lang, chunk, { cell: message.cell, anchor: message.anchor, text: message.text, author: this.guest });
-      this.hub.broadcast(lang, { type: "noted", note: { id, at, cell: message.cell, anchor: message.anchor, text: message.text, author: this.guest, nick: this.nick, color: this.color } });
+      const highlight = message.highlightColor ? { highlightColor: message.highlightColor } : {};
+      const { id, at } = await database.addNote(lang, chunk, { cell: message.cell, anchor: message.anchor, text: message.text, author: this.guest, ...highlight });
+      this.hub.broadcast(lang, { type: "noted", note: { id, at, cell: message.cell, anchor: message.anchor, text: message.text, author: this.guest, nick: this.nick, color: this.color, ...highlight } });
+      return;
+    }
+    if (message.type === "paint") {
+      if (!this.allowed("paint")) return;
+      if (await database.paintNote(lang, message.id, this.guest, message.color)) this.hub.broadcast(lang, { type: "painted", id: message.id, color: message.color });
+      return;
+    }
+    if (message.type === "share-note") {
+      if (!this.allowed("chat")) return;
+      const note = await database.noteById(lang, message.id);
+      if (!note?.anchor) return;
+      const { wall, shelf, volume, page, start, end } = note.anchor;
+      const place = { cell: note.cell, view: { kind: "desk" as const, wall, shelf, volume, page }, fragment: { page, start, end }, note: note.id };
+      const text = note.text || (lang === "ru" ? `Метка на странице ${page} · ${end - start} знаков` : `Highlight on page ${page} · ${end - start} characters`);
+      const { id, at } = await database.addMessage(lang, { author: this.guest, text, place });
+      this.hub.broadcast(lang, { type: "message", message: { id, at, author: this.guest, nick: this.nick, color: this.color, text, place } });
       return;
     }
     if (message.type === "forget") {
       if (!this.allowed("mod")) return;
-      if (!canForget(await database.authorOf(lang, message.kind, message.id), this.guest, this.admin)) return;
+      const note = message.kind === "note" ? await database.noteById(lang, message.id) : null;
+      if (!canForget(await database.authorOf(lang, message.kind, message.id), this.guest, this.admin && !note?.anchor)) return;
       if (await database.forget(lang, message.kind, message.id)) this.hub.broadcast(lang, { type: "forgotten", kind: message.kind, id: message.id });
       return;
     }

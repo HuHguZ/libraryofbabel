@@ -112,6 +112,10 @@ export function createOnlineStore(): OnlineStore {
           set({ notesVersion: snapshot.notesVersion + 1 });
           return;
         }
+        case "painted":
+          for (const [key, list] of notes) notes.set(key, list.map(note => note.id === m.id ? { ...note, highlightColor: m.color } : note));
+          set({ notesVersion: snapshot.notesVersion + 1 });
+          return;
         case "forgotten":
           if (m.kind === "chat") return set({ messages: snapshot.messages.filter((message) => message.id !== m.id) });
           for (const [key, list] of notes) notes.set(key, list.filter((note) => note.id !== m.id));

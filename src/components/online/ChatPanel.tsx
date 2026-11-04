@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Box, Flex, Input, Text, chakra } from "@chakra-ui/react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
@@ -43,6 +43,8 @@ export default function ChatPanel() {
   const [note, setNote] = useState<string | null>(null);
   const [now, setNow] = useState(() => ({ wall: Date.now(), mono: performance.now() }));
   const input = useRef<HTMLInputElement>(null);
+  const history = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
 
   // T opens the input, wherever the mouse is.
   useEffect(() => {
@@ -58,6 +60,10 @@ export default function ChatPanel() {
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);
+  useLayoutEffect(() => {
+    if (!open || status !== "online") following.current = true;
+    else if (following.current && history.current) history.current.scrollTop = history.current.scrollHeight;
+  }, [open, messages, status]);
   // Closed, old lines fade: re-render once a second while any line is still young.
   useEffect(() => {
     const timer = setInterval(() => setNow({ wall: Date.now(), mono: performance.now() }), 1000);
@@ -86,8 +92,11 @@ export default function ChatPanel() {
   const refusal = refused && now.mono - refused.at < 4000 ? t(refused.reason as "rate" | "length" | "banned" | "invalid") : null;
 
   return (
-    <Box position="absolute" left={{ base: 3, md: 6 }} bottom={{ base: 20, md: 24 }} zIndex={6} w="min(420px, calc(100% - 24px))" fontFamily={mono} fontSize="12px" pointerEvents="none">
-      <Box maxH={open ? "40vh" : "none"} overflowY={open ? "auto" : "visible"} pointerEvents={open ? "auto" : "none"} bg={open ? "rgba(8,8,15,0.8)" : "transparent"} borderRadius="8px" p={open ? 2 : 0}>
+    <Box position="absolute" left={{ base: 3, md: 6 }} bottom={{ base: 32, md: 24 }} zIndex={6} w="min(420px, calc(100% - 24px))" fontFamily={mono} fontSize="12px" pointerEvents="none">
+      <Box ref={history} onScroll={(event) => {
+        const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
+        following.current = scrollHeight - scrollTop - clientHeight <= 24;
+      }} maxH={open ? "40vh" : "none"} overflowY={open ? "auto" : "visible"} pointerEvents={open ? "auto" : "none"} bg={open ? "rgba(8,8,15,0.8)" : "transparent"} borderRadius="8px" p={open ? 2 : 0}>
         {shown.map((m) => (
           <Flex key={m.id} gap={2} py="2px" align="baseline" textShadow="0 0 4px #000">
             <Text as="span" color={m.color} flex="none">

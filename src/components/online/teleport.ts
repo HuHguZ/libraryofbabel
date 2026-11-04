@@ -21,6 +21,7 @@ export function sharedPlaceHref(place: SharedPlace): string {
   const cell = parseCellKey(place.cell)!;
   const { fragment } = place;
   if (place.view.kind === "desk" && fragment) {
+    if (place.note) return `/page/${addressOf(cell)}-${place.view.wall}-${place.view.shelf}-${place.view.volume}-${fragment.page}?note=${place.note}`;
     return `/page/${addressOf(cell)}-${place.view.wall}-${place.view.shelf}-${place.view.volume}-${fragment.page}?text=${fragment.page}:${fragment.start}-${fragment.end}`;
   }
   return viewHref(cell, place.view);
@@ -28,5 +29,5 @@ export function sharedPlaceHref(place: SharedPlace): string {
 export function noteHref(note: Note): string {
   const cell = parseCellKey(note.cell)!;
   const a = note.anchor;
-  return a ? `/page/${addressOf(cell)}-${a.wall}-${a.shelf}-${a.volume}-${a.page}?text=${a.page}:${a.start}-${a.end}` : placeHref(cell);
+  return a ? `/page/${addressOf(cell)}-${a.wall}-${a.shelf}-${a.volume}-${a.page}?note=${note.id}` : placeHref(cell);
 }

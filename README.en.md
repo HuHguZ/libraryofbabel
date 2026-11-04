@@ -35,6 +35,14 @@ And you can **walk through it**. Hexagonal galleries, spiral staircases, endless
 
 The Library speaks **two languages**. The `RU | EN` switch in the header changes more than the interface: it changes the Library itself. In English its books are written in Latin letters, so you can search it for English text.
 
+## Online demo
+
+[![Watch the project demo: players, chat, shared map and book highlights](docs/screenshots/online-demo.jpg)](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)
+
+**[▶ Watch the demo · 2:36 · Full HD · 30 fps](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)**
+
+Live players, chat, a shared map and notes. Saved highlights appear for everyone reading the same book; colour changes arrive instantly, and chat links take readers straight to a discovery. The demo uses the Russian interface.
+
 ## A walk
 
 The galleries never end. Beyond the door is a vestibule with a spiral staircase, beyond that the next gallery, and above and below there are more galleries still. Everything nearby is already loaded and drawn, so crossing from one gallery into the next gives nothing away: the world simply goes on.
@@ -244,7 +252,9 @@ The minimap shows shared exploration. `M` opens the full map: drag to pan, wheel
 
 `T` opens chat; `Enter` sends and `Esc` closes. “Share place” attaches the gallery, book and selected fragment as a clickable destination. Recent messages fade after 10 seconds; the last 200 are kept. Leave a gallery note from the HUD or a fragment note from the reader's text panel. Notes appear in lists, on the map, as book ribbons and as a sheet beside the door.
 
-Chat and notes accept up to 300 characters. Chat allows one message per two seconds with a burst of five; notes allow ten per hour with a burst of three. Limits apply to both guest and IP. Authors delete their own entries. `/admin <token>` (`ADMIN_TOKEN`) enables deleting any entry and banning guests/IPs; the token stays in this browser's localStorage and never goes into public chat.
+In the text panel, “Save highlight” stores the selection and its colour in Postgres. Every reader in the same language world sees highlights in the text and 3D book on opening an ordinary page. Buttons with author names select saved highlights; “Send to chat” shares a link to the stored entry. Only its author can recolour or delete it, and everyone sees the change immediately. Authorship belongs to the browser's guest cookie: clearing it creates a new guest without editing rights to older highlights. Unsaved selections stay personal.
+
+Chat and notes accept up to 300 characters. Chat allows one message per two seconds with a burst of five; notes with comments allow ten per hour with a burst of three; highlights without comments allow one per second with a burst of ten. Limits apply to both guest and IP. Authors delete their own entries. `/admin <token>` (`ADMIN_TOKEN`) enables deleting messages and gallery notes, and banning guests/IPs; only authors can edit or delete book highlights. The token stays in this browser's localStorage and never goes into public chat.
 
 One server keeps poses in memory and broadcasts them to all readers, intended for roughly 100 concurrent readers. Multiple servers would need shared pub/sub. VPS deployment, HTTPS and backups are a separate step. Avatar: [Quaternius Man, CC0](public/models/README.md).
 

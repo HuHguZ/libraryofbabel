@@ -7,6 +7,21 @@ import { cellKey, cellOf, chunkKeyOf } from "@/lib/world";
 const integration = process.env.ONLINE_INTEGRATION === "1";
 const lang = `test-${randomUUID()}`;
 const guest = randomUUID();
+it.skipIf(!integration)("persists highlight colours and only lets the author repaint a live anchored note", async () => {
+  await db.migrate();
+  await db.loadGuest(guest, () => ({ nick: "Test reader", color: "#b02e3a" }));
+  const anchor = { wall: 1, shelf: 2, volume: 3, page: 4, start: 10, end: 30 };
+  const mark = await db.addNote(lang, "0:0", { cell: "0:0", anchor, text: "", author: guest, highlightColor: "#3a6fc4" });
+  await db.migrate();
+  expect(await db.noteById(lang, mark.id)).toMatchObject({ anchor, highlightColor: "#3a6fc4" });
+  expect(await db.paintNote(lang, mark.id, randomUUID(), "#4f9a5a")).toBe(false);
+  expect(await db.paintNote("other", mark.id, guest, "#4f9a5a")).toBe(false);
+  expect(await db.noteById("other", mark.id)).toBeNull();
+  expect(await db.paintNote(lang, mark.id, guest, "#4f9a5a")).toBe(true);
+  expect((await db.notesIn(lang, ["0:0"])).get("0:0")?.find(n => n.id === mark.id)).toMatchObject({ highlightColor: "#4f9a5a" });
+  await db.forget(lang, "note", mark.id);
+  expect(await db.paintNote(lang, mark.id, guest, "#b02e3a")).toBe(false);
+});
 afterAll(async () => {
   if (integration) {
     await db.sql`delete from notes where lang = ${lang}`;

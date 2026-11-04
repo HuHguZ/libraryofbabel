@@ -12,14 +12,15 @@ import { useStageDesk, useStageHandlers, useStageSelector, useStageView } from "
 import type { StageView } from "@/components/explore/stage/stageStore";
 import { useLocalizedPath, useRouter } from "@/i18n/navigation";
 import { normalizeQuery } from "@/lib/alphabet";
-import { formatFragment, fragmentReducer, parseFragment, shownFragment, type TextFragment } from "@/lib/fragment";
+import { formatFragment, fragmentReducer, parseFragment, sameFragment, shownFragment, type TextFragment } from "@/lib/fragment";
 import { shortHex } from "@/lib/hex";
 import { spreadMatches, stepMatch } from "@/lib/matches";
 import { useFragmentColor } from "@/lib/fragmentColor";
 import { LIBRARY, clampInt, isValidHex } from "@/lib/library";
-import { cellOf } from "@/lib/world";
-import type { Anchor } from "@/lib/online/protocol";
-import { useOnlineSelector } from "@/components/online/OnlineProvider";
+import { cellOf, cellKey, chunkKeyOf } from "@/lib/world";
+import type { Anchor, Note } from "@/lib/online/protocol";
+import { useOnlineSelector, useOnlineStore } from "@/components/online/OnlineProvider";
+import { noteHref } from "@/components/online/teleport";
 import NoteComposer from "@/components/online/NoteComposer";
 
 const mono = "var(--font-jetbrains), monospace";
@@ -62,9 +63,9 @@ const rightPage = (k: number) => Math.min(LIBRARY.pages, Math.max(1, 2 * k + 1))
  * Link to a spread, with the phrase searched for and the marked fragment when it lies on this spread
  * (`?text=<page>:<start>-<end>`). Such a link names the fragment's own page, so it opens at the same spread.
  */
-function readerHref(address: Address, spread: number, query: string, fragment: TextFragment | null): string {
+function readerHref(address: Address, spread: number, query: string, fragment: TextFragment | null, note?: number): string {
   const shown = fragment && spreadPages(spread).includes(fragment.page) ? fragment : null;
-  const params = [query ? `q=${encodeURIComponent(query)}` : "", shown ? `text=${formatFragment(shown)}` : ""].filter(Boolean).join("&");
+  const params = [query ? `q=${encodeURIComponent(query)}` : "", shown && note ? `note=${note}` : shown ? `text=${formatFragment(shown)}` : ""].filter(Boolean).join("&");
   return `/page/${encodeURIComponent(formatAddress({ ...address, page: shown ? shown.page : rightPage(spread) }))}${params ? `?${params}` : ""}`;
 }
 
@@ -107,10 +108,11 @@ export default function PageView() {
       </HudLayer>
     );
   }
-  return <Reader key={raw} address={address} initialQuery={initialQuery} initialFragment={initialFragment} />;
+  const note = Number(searchParams.get("note"));
+  return <Reader key={raw} address={address} initialQuery={initialQuery} initialFragment={initialFragment} initialNote={Number.isSafeInteger(note) && note > 0 ? note : null} />;
 }
 
-function Reader({ address, initialQuery, initialFragment }: { address: Address; initialQuery: string; initialFragment: TextFragment | null }) {
+function Reader({ address, initialQuery, initialFragment, initialNote }: { address: Address; initialQuery: string; initialFragment: TextFragment | null; initialNote: number | null }) {
   const t = useTranslations("Reader");
   const explore = useTranslations("Explore");
   const common = useTranslations("Common");
@@ -123,13 +125,37 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   const [input, setInput] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
   // A shared link to a fragment opens with the text beside the book.
-  const [textOpen, setTextOpen] = useState(initialFragment !== null);
+  const [textOpen, setTextOpen] = useState(initialFragment !== null || initialNote !== null);
   // The marked fragment, and the part of the text being selected right now (it replaces the mark once the selection ends).
   const [fragments, dispatchFragment] = useReducer(fragmentReducer, { mark: initialFragment, live: null });
   const [fragmentColor] = useFragmentColor();
+  const onlineStore = useOnlineStore();
   const online = useOnlineSelector((s) => s.status === "online");
+  const you = useOnlineSelector(s => s.you?.id);
+  const notesVersion = useOnlineSelector(s => s.notesVersion);
+  const refused = useOnlineSelector(s => s.refused);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const requestedNote = useRef(initialNote);
+  useEffect(() => { requestedNote.current = initialNote; }, [initialNote]);
   const [noting, setNoting] = useState<Anchor | null>(null);
   const cell = useMemo(() => cellOf(address.hex), [address.hex]);
+  const notes = useMemo(() => {
+    void notesVersion; // The version invalidates the store's mutable chunk cache.
+    return onlineStore.notesAt(cell).filter(n => n.anchor?.wall === address.wall && n.anchor.shelf === address.shelf && n.anchor.volume === address.volume);
+  }, [onlineStore, cell, address, notesVersion]);
+  const highlights = useMemo(() => notes.map(n => ({ ...n.anchor!, color: n.highlightColor ?? n.color })), [notes]);
+  const rawMark = shownFragment(fragments);
+  const savedNote = notes.find(n => n.id === selectedId && sameFragment(n.anchor, rawMark)) ?? notes.find(n => n.author === you && sameFragment(n.anchor, rawMark));
+  const marked = selectedId !== null && !savedNote && !fragments.live ? null : rawMark;
+  const markColor = savedNote ? savedNote.highlightColor ?? savedNote.color : fragmentColor;
+  useEffect(() => onlineStore.watch([chunkKeyOf(cell)]), [onlineStore, cell]);
+  useEffect(() => {
+    if (!saving) return;
+    if (!savedNote && !refused && online) return;
+    const timer = setTimeout(() => setSaving(false), 0);
+    return () => clearTimeout(timer);
+  }, [saving, savedNote, refused, online]);
   // Each request to show the fragment (the link opening, "show"): the panel scrolls to it and the camera glides to it.
   const [fragmentFocus, setFragmentFocus] = useState(() => {
     const here = initialFragment !== null && Math.floor(initialFragment.page / 2) === Math.floor(address.page / 2);
@@ -192,10 +218,11 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   // A fragment marked on the open spread goes into it too, so the address bar holds the same link "link to fragment" copies.
   useEffect(() => {
     const timer = setTimeout(() => {
-      window.history.replaceState(null, "", localizedPath(readerHref(address, spread, query, fragments.mark)));
+      if (requestedNote.current) return;
+      window.history.replaceState(null, "", localizedPath(readerHref(address, spread, query, marked, savedNote?.id)));
     }, 300);
     return () => clearTimeout(timer);
-  }, [spread, query, fragments.mark, address, localizedPath]);
+  }, [spread, query, marked, savedNote?.id, address, localizedPath]);
 
   // Highlight what is typed, a moment after typing stops.
   useEffect(() => {
@@ -253,7 +280,10 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   }, [go]);
 
   // The selection is gone (a click elsewhere, the panel closing): what it covered stays marked.
-  const onSelection = useCallback((selected: TextFragment | null) => dispatchFragment({ type: "select", fragment: selected }), []);
+  const onSelection = useCallback((selected: TextFragment | null) => {
+    if (selected) { setSelectedId(null); setSaving(false); }
+    dispatchFragment({ type: "select", fragment: selected });
+  }, []);
 
   /** Turns the selection into the mark right away and lets go of it. */
   const settleSelection = useCallback(() => {
@@ -275,9 +305,33 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   }, [fragments, settleSelection]);
 
   const clearFragment = useCallback(() => {
+    setSelectedId(null);
+    setSaving(false);
     dispatchFragment({ type: "clear" });
     window.getSelection()?.removeAllRanges();
   }, []);
+
+  const chooseNote = useCallback((note: Note) => {
+    if (!note.anchor) return;
+    window.getSelection()?.removeAllRanges();
+    dispatchFragment({ type: "select", fragment: note.anchor });
+    dispatchFragment({ type: "settle" });
+    setSelectedId(note.id);
+    setSaving(false);
+    const k = Math.floor(note.anchor.page / 2);
+    spreadRef.current = k;
+    setSpread(k);
+    setTextOpen(true);
+    setFragmentFocus(f => ({ n: f.n + 1, spread: k }));
+  }, []);
+  useEffect(() => {
+    const note = notes.find(n => n.id === requestedNote.current);
+    if (!note) return;
+    requestedNote.current = null;
+    const timer = setTimeout(() => chooseNote(note), 0);
+    return () => clearTimeout(timer);
+  }, [notes, chooseNote, initialNote]);
+  const paintTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
 
   /**
    * Enter / Shift+Enter and the arrows of the find bar. A phrase still being typed is looked for at once;
@@ -309,8 +363,7 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
   const label = spread === 0 ? t("titlePage") : t("spreadPages", { from: 2 * spread, to: Math.min(LIBRARY.pages, 2 * spread + 1) });
   const shownTitle = title.trim() ? common("quoted", { text: title.trim() }) : common("volumeN", { n: address.volume });
   const currentAddress = formatAddress({ ...address, page: rightPage(spread) });
-  const marked = shownFragment(fragments);
-  const sharePath = marked ? localizedPath(readerHref(address, Math.floor(marked.page / 2), query, marked)) : "";
+  const sharePath = savedNote ? localizedPath(noteHref(savedNote)) : marked ? localizedPath(readerHref(address, Math.floor(marked.page / 2), query, marked)) : "";
   // Rendered on the server too, where there is no origin; the link is only read when it is copied.
   const shareUrl = sharePath && typeof window !== "undefined" ? `${window.location.origin}${sharePath}` : sharePath;
 
@@ -324,7 +377,8 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
     currentMatch,
     matchStep: matchCursor.step,
     mark: marked,
-    markColor: fragmentColor,
+    markColor,
+    highlights,
     markFocusToken: fragmentFocus.n ? String(fragmentFocus.n) : undefined,
     loupe: loupe.active,
   });
@@ -362,8 +416,28 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
                 query={query}
                 page={rightPage(spread)}
                 address={currentAddress}
-                fragment={fragments.mark}
+                fragment={selectedId !== null && !savedNote && !fragments.live ? null : fragments.mark}
                 live={fragments.live}
+                notes={notes}
+                savedNote={savedNote}
+                canEdit={savedNote?.author === you}
+                saving={saving}
+                onChoose={chooseNote}
+                onSave={online && marked && !savedNote ? () => {
+                  settleSelection();
+                  setSaving(true);
+                  onlineStore.send({ type: "note", cell: cellKey(cell), anchor: { wall: address.wall, shelf: address.shelf, volume: address.volume, ...marked }, text: "", highlightColor: fragmentColor });
+                } : undefined}
+                onPaint={savedNote && savedNote.author === you ? color => {
+                  const id = savedNote.id;
+                  clearTimeout(paintTimers.current.get(id));
+                  paintTimers.current.set(id, setTimeout(() => { paintTimers.current.delete(id); onlineStore.send({ type: "paint", id, color }); }, 100));
+                } : undefined}
+                onChat={online && savedNote ? () => onlineStore.send({ type: "share-note", id: savedNote.id }) : undefined}
+                onDelete={online && savedNote && savedNote.author === you ? () => {
+                  onlineStore.send({ type: "forget", kind: "note", id: savedNote.id });
+                  clearFragment();
+                } : undefined}
                 shareUrl={shareUrl}
                 scrollToken={fragmentFocus.spread === spread ? fragmentFocus.n : 0}
                 currentMatch={currentMatch}
@@ -382,7 +456,7 @@ function Reader({ address, initialQuery, initialFragment }: { address: Address; 
           </AnimatePresence>
           {online && noting && (
             <Box position="absolute" bottom="100px" left="50%" transform="translateX(-50%)" zIndex={9} pointerEvents="auto">
-              <NoteComposer cell={cell} anchor={noting} onDone={() => setNoting(null)} />
+              <NoteComposer cell={cell} anchor={noting} highlightColor={markColor} onDone={() => setNoting(null)} />
             </Box>
           )}
           </>

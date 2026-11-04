@@ -45,6 +45,34 @@ describe("online controls", () => {
     expect(screen.queryByRole("textbox", { name: copy.Chat.placeholder })).toBeNull();
     expect(screen.getByRole("button", { name: copy.Chat.open })).not.toBeNull();
   });
+  it("follows the latest chat on opening and new messages without interrupting older-history reading", () => {
+    const message = (id: number) => ({ id, author: "other", nick: "Other", color: "#abcdef", text: `Line ${id}`, place: null, at: new Date().toISOString() });
+    online.receive({ type: "history", messages: Array.from({ length: 30 }, (_, i) => message(i + 1)) });
+    ui(<ChatPanel />);
+    const history = screen.getByText("Line 30").parentElement!.parentElement!;
+    let height = 1000;
+    Object.defineProperties(history, { scrollHeight: { get: () => height }, clientHeight: { value: 300 } });
+    fireEvent.click(screen.getByRole("button", { name: messages.Chat.open }));
+    expect(history.scrollTop).toBeGreaterThanOrEqual(700);
+    height = 1200;
+    act(() => online.receive({ type: "message", message: message(31) }));
+    expect(history.scrollTop).toBeGreaterThanOrEqual(900);
+    history.scrollTop = 100;
+    fireEvent.scroll(history);
+    height = 1400;
+    act(() => online.receive({ type: "message", message: message(32) }));
+    expect(history.scrollTop).toBe(100);
+    history.scrollTop = 1100;
+    fireEvent.scroll(history);
+    height = 1600;
+    act(() => online.receive({ type: "message", message: message(33) }));
+    expect(history.scrollTop).toBeGreaterThanOrEqual(1300);
+    history.scrollTop = 100;
+    fireEvent.scroll(history);
+    fireEvent.click(screen.getByRole("button", { name: messages.Chat.close }));
+    fireEvent.click(screen.getByRole("button", { name: messages.Chat.open }));
+    expect(history.scrollTop).toBeGreaterThanOrEqual(1300);
+  });
   it("keeps a large roster in a named, height-limited scroll region", () => {
     online.receive({ type: "players", list: Array.from({ length: 30 }, (_, i) => ({
       id: `reader-${i}`, nick: `Reader${i}`.padEnd(24, "x"), color: "#abcdef", cell: "0:0",

@@ -9,6 +9,7 @@ const MATCH_WASH = "rgba(201, 168, 76, 0.35)";
 /** The occurrence the reader is at; the 3D book draws it in the same colour. */
 const CURRENT_WASH = "rgba(232, 118, 22, 0.55)";
 const INK = "#2a1f0e";
+type Highlight = { start: number; end: number; color: string };
 
 interface BookPageProps {
   content: string;
@@ -27,6 +28,7 @@ interface BookPageProps {
   current?: number | null;
   /** The reader's fragment colour ("#rrggbb"): the mark and the selection are washed in it; the 3D book uses it too. */
   fragmentColor?: string;
+  highlights?: Highlight[];
 }
 
 interface Segment {
@@ -34,10 +36,11 @@ interface Segment {
   match: boolean;
   current: boolean;
   mark: boolean;
+  colors: string[];
 }
 
 /** Cuts the text wherever a search match or the mark begins or ends. */
-export function segmentText(content: string, query: string, mark: BookPageProps["mark"], current: number | null = null): Segment[] {
+export function segmentText(content: string, query: string, mark: BookPageProps["mark"], current: number | null = null, highlights: Highlight[] = []): Segment[] {
   const matches = findMatches(content, query);
   const cuts = new Set([0, content.length]);
   for (const s of matches) {
@@ -50,6 +53,10 @@ export function segmentText(content: string, query: string, mark: BookPageProps[
     cuts.add(from);
     cuts.add(to);
   }
+  for (const h of highlights) {
+    cuts.add(Math.max(0, Math.min(content.length, h.start)));
+    cuts.add(Math.max(0, Math.min(content.length, h.end)));
+  }
   const bounds = [...cuts].sort((a, b) => a - b);
   const out: Segment[] = [];
   let m = 0;
@@ -59,16 +66,17 @@ export function segmentText(content: string, query: string, mark: BookPageProps[
     const match = m < matches.length && matches[m] <= a;
     const isCurrent = match && matches[m] === current;
     const marked = a >= from && a < to;
+    const colors = [...new Set(highlights.filter(h => a >= h.start && a < h.end).map(h => h.color))];
     const last = out[out.length - 1];
     const text = content.slice(a, bounds[i + 1]);
-    if (last && last.match === match && last.current === isCurrent && last.mark === marked) last.text += text;
-    else out.push({ text, match, current: isCurrent, mark: marked });
+    if (last && last.match === match && last.current === isCurrent && last.mark === marked && last.colors.join() === colors.join()) last.text += text;
+    else out.push({ text, match, current: isCurrent, mark: marked, colors });
   }
   return out;
 }
 
-export default function BookPage({ content, highlight, mark, selecting, page, current = null, fragmentColor = DEFAULT_FRAGMENT_COLOR }: BookPageProps) {
-  const segments = useMemo(() => segmentText(content, highlight ?? "", mark, current), [content, highlight, mark, current]);
+export default function BookPage({ content, highlight, mark, selecting, page, current = null, fragmentColor = DEFAULT_FRAGMENT_COLOR, highlights }: BookPageProps) {
+  const segments = useMemo(() => segmentText(content, highlight ?? "", mark, current, highlights), [content, highlight, mark, current, highlights]);
   const tint = { wash: fragmentWash(fragmentColor, FRAGMENT_ALPHA.panel), selection: fragmentWash(fragmentColor, FRAGMENT_ALPHA.selection) };
   return (
     <Box position="relative" maxW="900px" mx="auto">
@@ -191,15 +199,19 @@ export default function BookPage({ content, highlight, mark, selecting, page, cu
             "&[data-selecting] mark[data-match][data-fragment]": { bg: MATCH_WASH },
           }}
         >
-          {segments.map((s, i) =>
-            s.match || s.mark ? (
-              <mark key={i} data-match={s.match || undefined} data-current={s.current || undefined} data-fragment={s.mark || undefined}>
+          {segments.map((s, i) => {
+            const stripes = s.colors.flatMap((color, n) => [0, 1].map(edge => `${fragmentWash(color, FRAGMENT_ALPHA.panel)} ${(n + edge) / s.colors.length * 100}%`));
+            const searchWash = s.current ? CURRENT_WASH : s.match ? MATCH_WASH : null;
+            const background = [searchWash && `linear-gradient(${searchWash}, ${searchWash})`, `linear-gradient(90deg, ${stripes.join(",")})`].filter(Boolean).join(", ");
+            return s.match || s.mark || s.colors.length ? (
+              <mark key={i} data-match={s.match || undefined} data-current={s.current || undefined} data-fragment={s.mark || undefined} data-saved-colors={s.colors.length ? s.colors.join(",") : undefined}
+                style={s.colors.length ? { background } : undefined}>
                 {s.text}
               </mark>
             ) : (
               s.text
-            )
-          )}
+            );
+          })}
         </Box>
       </Box>
     </Box>

@@ -4,13 +4,47 @@ import type { ServerMessage } from "@/lib/online/protocol";
 import { OnlineHub, type Storage } from "./session";
 import { createOnlineStore } from "@/components/online/onlineStore";
 const pose = { type: "pose", cell: "0:0", p: [0, 1.6, 0], yaw: 0, view: { kind: "walk", wall: 1 } };
+it("protects saved mark colours and deletion from other readers and admins, and shares the stored anchor", async () => {
+  const anchor = { wall: 1, shelf: 2, volume: 3, page: 4, start: 10, end: 30 };
+  const mark = { id: 42, cell: "0:0", anchor, text: "", author: "author", nick: "Author", color: "#b02e3a", highlightColor: "#3a6fc4", at: "2026-11-04T00:00:00Z" };
+  let forgotten = false;
+  const hub = new OnlineHub(storage({
+    addNote: async () => ({ id: mark.id, at: mark.at }),
+    noteById: async (lang, id) => lang === "ru" && id === 42 ? mark : null,
+    paintNote: async (lang, id, author, color) => { if (lang !== "ru" || id !== 42 || author !== mark.author) return false; mark.highlightColor = color; return true; },
+    authorOf: async () => mark.author, forget: async () => { forgotten = true; return true; },
+  }), "token");
+  const a = tab(hub, "author"), b = tab(hub, "other"), admin = tab(hub, "admin");
+  await a.receive({ type: "hello", lang: "ru" }); await b.receive({ type: "hello", lang: "ru" }); await admin.receive({ type: "hello", lang: "ru", admin: "token" });
+  await a.receive({ type: "note", cell: "0:0", anchor, text: "", highlightColor: mark.highlightColor });
+  expect(b.messages.at(-1)).toMatchObject({ type: "noted", note: { highlightColor: "#3a6fc4" } });
+  await b.receive({ type: "paint", id: 42, color: "#abcdef" }); await admin.receive({ type: "paint", id: 42, color: "#abcdef" });
+  expect(mark.highlightColor).toBe("#3a6fc4");
+  await a.receive({ type: "paint", id: 42, color: "#4f9a5a" });
+  expect(b.messages.at(-1)).toEqual({ type: "painted", id: 42, color: "#4f9a5a" });
+  await b.receive({ type: "share-note", id: 42 });
+  expect(a.messages.at(-1)).toMatchObject({ type: "message", message: { place: { note: 42, cell: "0:0", view: { kind: "desk", wall: 1, shelf: 2, volume: 3, page: 4 } } } });
+  await admin.receive({ type: "forget", kind: "note", id: 42 }); expect(forgotten).toBe(false);
+  await a.receive({ type: "forget", kind: "note", id: 42 }); expect(forgotten).toBe(true);
+});
+it("replays mark recolouring after a concurrent chunk snapshot", async () => {
+  let release!: (value: Map<string, Uint8Array>) => void;
+  const mark = { id: 42, cell: "0:0", anchor: { wall: 1, shelf: 2, volume: 3, page: 4, start: 10, end: 30 }, text: "", author: "other", nick: "Other", color: "#b02e3a", highlightColor: "#3a6fc4", at: "2026-11-04T00:00:00Z" };
+  const hub = new OnlineHub(storage({ notesIn: async () => new Map([["0:0", [mark]]]), loadFog: () => new Promise(done => { release = done; }) }), "");
+  const store = createOnlineStore(), a = hub.connect("a", "a", message => store.receive(message), () => {});
+  await a.receive(JSON.stringify({ type: "hello", lang: "ru" }));
+  const watch = a.receive(JSON.stringify({ type: "watch", chunks: ["0:0"] }));
+  await new Promise(done => setImmediate(done));
+  hub.broadcast("ru", { type: "painted", id: 42, color: "#4f9a5a" }); release(new Map()); await watch;
+  expect(store.notesAt({ x: 0n, floor: 0n })[0].highlightColor).toBe("#4f9a5a");
+});
 function storage(overrides: Partial<Storage> = {}): Storage {
   return {
     loadGuest: async () => ({ nick: "Reader", color: "#b02e3a" }), lastPlace: async () => null,
     saveProfile: async () => {}, savePlace: async () => {}, loadFog: async () => new Map(), addFog: async () => {},
     notesIn: async () => new Map(), recentMessages: async () => [], addMessage: async () => ({ id: 1, at: "2026-10-04T00:00:00Z" }),
     addNote: async () => ({ id: 1, at: "2026-10-04T00:00:00Z" }), authorOf: async () => null,
-    forget: async () => false, addBan: async () => {}, ...overrides,
+    forget: async () => false, addBan: async () => {}, noteById: async () => null, paintNote: async () => false, ...overrides,
   };
 }
 function tab(hub: OnlineHub, guest: string, ip = guest) {

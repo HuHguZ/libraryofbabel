@@ -45,4 +45,14 @@ describe("client protocol", () => {
   it("drops malformed, oversized and unknown messages", () => {
     for (const raw of ["{", "null", "[]", JSON.stringify({ type: "unknown" }), JSON.stringify({ ...pose, pad: "x".repeat(70000) })]) expect(parseClientMessage(raw)).toBeNull();
   });
+  it("validates saved highlight colours, owner edit requests and stored-note shares", () => {
+    const anchor = { wall: 1, shelf: 2, volume: 3, page: 4, start: 10, end: 30 };
+    expect(parse({ type: "note", cell: "0:0", anchor, text: "", highlightColor: "#ABCDEF" })).toEqual({ type: "note", cell: "0:0", anchor, text: "", highlightColor: "#abcdef" });
+    expect(parse({ type: "note", cell: "0:0", anchor: null, text: "", highlightColor: "#abcdef" })).toBeNull();
+    expect(parse({ type: "note", cell: "0:0", anchor, text: "", highlightColor: "url(x)" })).toBeNull();
+    expect(parse({ type: "paint", id: 7, color: "#123ABC", author: "someone else" })).toEqual({ type: "paint", id: 7, color: "#123abc" });
+    expect(parse({ type: "paint", id: 0, color: "#123abc" })).toBeNull();
+    expect(parse({ type: "share-note", id: 7 })).toEqual({ type: "share-note", id: 7 });
+    expect(parse({ type: "share-note", id: 1e30 })).toBeNull();
+  });
 });

@@ -18,6 +18,7 @@ create table if not exists notes (
   anchor jsonb, text text not null, author uuid not null references guests(id),
   created_at timestamptz not null default now(), forgotten boolean not null default false
 );
+alter table notes add column if not exists highlight_color text;
 drop index if exists notes_chunk;
 create index if not exists notes_chunk_hash on notes using hash (chunk) where not forgotten;
 create table if not exists messages (

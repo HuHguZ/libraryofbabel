@@ -9,7 +9,7 @@ import { useOnlineStore } from "./OnlineProvider";
 import { useStageStore } from "@/components/explore/stage/StageProvider";
 
 /** Writing a note on a gallery (anchor null) or on a fragment of a page. */
-export default function NoteComposer({ cell, anchor, onDone }: { cell: Cell; anchor: Anchor | null; onDone: () => void }) {
+export default function NoteComposer({ cell, anchor, highlightColor, onDone }: { cell: Cell; anchor: Anchor | null; highlightColor?: string; onDone: () => void }) {
   const t = useTranslations("Notes");
   const online = useOnlineStore();
   const stage = useStageStore();
@@ -18,7 +18,7 @@ export default function NoteComposer({ cell, anchor, onDone }: { cell: Cell; anc
   const clean = cleanText(text);
   const save = () => {
     if (!clean || online.getSnapshot().status !== "online") return;
-    online.send({ type: "note", cell: cellKey(cell), anchor, text: clean });
+    online.send({ type: "note", cell: cellKey(cell), anchor, text: clean, ...(highlightColor && { highlightColor }) });
     onDone();
   };
   return (

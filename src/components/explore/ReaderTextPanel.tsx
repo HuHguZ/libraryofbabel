@@ -11,6 +11,7 @@ import { fragmentFromSelection, type TextFragment } from "@/lib/fragment";
 import { useFragmentColor } from "@/lib/fragmentColor";
 import FragmentColorPicker from "./FragmentColorPicker";
 import { HudButton, HudCopyButton } from "./ExploreHud";
+import type { Note } from "@/lib/online/protocol";
 
 const mono = "var(--font-jetbrains), monospace";
 const serif = "var(--font-cormorant), Georgia, serif";
@@ -46,6 +47,15 @@ export interface ReaderTextPanelProps {
   onShare: () => void;
   /** Leave a note on the marked fragment; absent while offline. */
   onNote?: () => void;
+  notes?: Note[];
+  savedNote?: Note;
+  canEdit?: boolean;
+  saving?: boolean;
+  onSave?: () => void;
+  onChoose?: (note: Note) => void;
+  onPaint?: (color: string) => void;
+  onChat?: () => void;
+  onDelete?: () => void;
   onShow: () => void;
   onClear: () => void;
   onClose: () => void;
@@ -57,6 +67,7 @@ export default function ReaderTextPanel(props: ReaderTextPanelProps) {
   const common = useTranslations("Common");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fragmentColor, setFragmentColor] = useFragmentColor();
+  const color = props.savedNote ? props.savedNote.highlightColor ?? props.savedNote.color : fragmentColor;
 
   const onSelection = useRef(props.onSelection);
   useLayoutEffect(() => {
@@ -146,12 +157,21 @@ export default function ReaderTextPanel(props: ReaderTextPanelProps) {
                 </Text>
                 <HudCopyButton value={contents[p] ?? ""} label={t("copyText")} copiedLabel={t("copied")} title={t("copyTextTitle", { n: p })} />
               </Flex>
+              <Flex gap={2} flexWrap="wrap" mb={2}>
+                {props.notes?.filter(n => n.anchor?.page === p).map(n => (
+                  <HudButton key={n.id} active={n.id === props.savedNote?.id} onClick={() => props.onChoose?.(n)} title={n.text || t("savedMark")}>
+                    <Box as="span" display="inline-block" w="8px" h="8px" borderRadius="full" bg={n.highlightColor ?? n.color} mr={2} />
+                    {n.nick} · {n.anchor!.end - n.anchor!.start}
+                  </HudButton>
+                ))}
+              </Flex>
               <BookPage
                 page={p}
                 content={contents[p] ?? ""}
                 highlight={query || undefined}
                 current={currentMatch?.page === p ? currentMatch.start : null}
-                fragmentColor={fragmentColor}
+                fragmentColor={color}
+                highlights={props.notes?.filter(n => n.anchor?.page === p).map(n => ({ ...n.anchor!, color: n.highlightColor ?? n.color }))}
                 mark={fragment?.page === p ? fragment : null}
                 selecting={live !== null}
               />
@@ -173,9 +193,9 @@ export default function ReaderTextPanel(props: ReaderTextPanelProps) {
               <Flex align="center" gap={2} flexWrap="wrap" px={{ base: 4, md: 6 }} py={3} borderTop="1px solid" borderColor="brand.300/25" bg="rgba(12,9,12,0.96)">
                 <Box flex={{ base: "1 1 100%", sm: "1 1 0" }} minW={0}>
                   <Flex align="center" gap={2}>
-                    <FragmentColorPicker color={fragmentColor} onChange={setFragmentColor} />
+                    {(!props.savedNote || props.canEdit) ? <FragmentColorPicker color={color} onChange={props.savedNote ? props.onPaint! : setFragmentColor} /> : <Box w="12px" h="12px" borderRadius="full" bg={color} />}
                     <Text color="dark.100" fontSize="10px" textTransform="uppercase" letterSpacing="0.2em" fontFamily={mono} whiteSpace="nowrap">
-                      {t("fragment")}
+                      {props.savedNote ? props.savedNote.nick : t("fragment")}
                     </Text>
                     <Text color="parchment.200" fontSize="xs" fontFamily={mono} whiteSpace="nowrap">
                       {t("fragmentInfo", { page: shown.page, count: shown.end - shown.start })}
@@ -188,6 +208,10 @@ export default function ReaderTextPanel(props: ReaderTextPanelProps) {
                   )}
                 </Box>
                 <Flex gap={2} flexShrink={0} flexWrap="wrap" maxW="100%" ml="auto">
+                  {props.onSave && !props.savedNote && <HudButton disabled={props.saving} onClick={props.onSave}>{t(props.saving ? "savingMark" : "saveMark")}</HudButton>}
+                  {props.savedNote && <Text color="brand.200" fontSize="xs" alignSelf="center">{t("savedMark")}</Text>}
+                  {props.onChat && <HudButton onClick={props.onChat}>{t("shareMarkChat")}</HudButton>}
+                  {props.canEdit && props.onDelete && <HudButton onClick={props.onDelete}>{t("deleteMark")}</HudButton>}
                   <HudButton onClick={onShow} title={t("showFragmentTitle")}>
                     {t("showFragment")}
                   </HudButton>

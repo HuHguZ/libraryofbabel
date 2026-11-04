@@ -6,8 +6,8 @@ export type View = { kind: "walk"; wall: number } | { kind: "shelf"; wall: numbe
 export interface Pose { cell: string; p: [number, number, number]; yaw: number; view: View }
 export interface Player extends Pose { id: string; nick: string; color: string }
 export interface Anchor { wall: number; shelf: number; volume: number; page: number; start: number; end: number }
-export interface SharedPlace { cell: string; view: View; fragment?: { page: number; start: number; end: number } }
-export interface Note { id: number; cell: string; anchor: Anchor | null; text: string; author: string; nick: string; color: string; at: string }
+export interface SharedPlace { cell: string; view: View; fragment?: { page: number; start: number; end: number }; note?: number }
+export interface Note { id: number; cell: string; anchor: Anchor | null; text: string; author: string; nick: string; color: string; highlightColor?: string; at: string }
 export interface ChatMessage { id: number; author: string; nick: string; color: string; text: string; place: SharedPlace | null; at: string }
 export type ClientMessage =
   | { type: "hello"; lang: Locale; admin?: string }
@@ -15,7 +15,9 @@ export type ClientMessage =
   | { type: "profile"; nick?: string; color?: string }
   | { type: "watch"; chunks: string[] }
   | { type: "chat"; text: string; place?: SharedPlace }
-  | { type: "note"; cell: string; anchor: Anchor | null; text: string }
+  | { type: "note"; cell: string; anchor: Anchor | null; text: string; highlightColor?: string }
+  | { type: "paint"; id: number; color: string }
+  | { type: "share-note"; id: number }
   | { type: "forget"; kind: "note" | "chat"; id: number }
   | { type: "ban"; guest: string };
 export type ServerMessage =
@@ -28,6 +30,7 @@ export type ServerMessage =
   | { type: "history"; messages: ChatMessage[] }
   | { type: "message"; message: ChatMessage }
   | { type: "noted"; note: Note }
+  | { type: "painted"; id: number; color: string }
   | { type: "forgotten"; kind: "note" | "chat"; id: number }
   | { type: "refused"; reason: "rate" | "length" | "banned" | "invalid" };
 export const PLAYER_COLORS = ["#b02e3a", "#d9722b", "#c9a227", "#4f9a5a", "#2e8f9e", "#3a6fc4", "#7b52c7", "#c24d9a"] as const;
@@ -102,10 +105,17 @@ export function parseClientMessage(raw: string): ClientMessage | null {
       return place ? { type: "chat", text, place } : null;
     }
     case "note": {
-      const text = cleanText(o.text);
       const anchor = o.anchor === undefined || o.anchor === null ? null : parseAnchor(o.anchor);
-      return text && cell(o.cell) && (o.anchor == null || anchor) ? { type: "note", cell: canonicalCell(o.cell), anchor, text } : null;
+      const highlightColor = o.highlightColor === undefined ? undefined : cleanColor(o.highlightColor);
+      if (highlightColor === null || (highlightColor !== undefined && !anchor)) return null;
+      const text = o.text === "" && anchor && highlightColor ? "" : cleanText(o.text);
+      return text !== null && cell(o.cell) && (o.anchor == null || anchor) ? { type: "note", cell: canonicalCell(o.cell), anchor, text, ...(highlightColor && { highlightColor }) } : null;
     }
+    case "paint": {
+      const color = cleanColor(o.color);
+      return color && integer(o.id, 1, Number.MAX_SAFE_INTEGER) ? { type: "paint", id: o.id, color } : null;
+    }
+    case "share-note": return integer(o.id, 1, Number.MAX_SAFE_INTEGER) ? { type: "share-note", id: o.id } : null;
     case "forget": return (o.kind === "note" || o.kind === "chat") && integer(o.id, 1, Number.MAX_SAFE_INTEGER) ? { type: "forget", kind: o.kind, id: o.id } : null;
     case "ban": return typeof o.guest === "string" && UUID.test(o.guest) ? { type: "ban", guest: o.guest } : null;
     default: return null;

@@ -11,7 +11,7 @@ export class Bucket {
     return true;
   }
 }
-const RATES = { pose: [12, 12], profile: [0.2, 1], watch: [4, 8], chat: [0.5, 5], note: [10 / 3600, 3], mod: [1, 5] } as const;
+const RATES = { pose: [12, 12], profile: [0.2, 1], watch: [4, 8], chat: [0.5, 5], note: [10 / 3600, 3], mark: [1, 10], paint: [10, 10], mod: [1, 5] } as const;
 /** Buckets belong to identities and IPs, so opening another tab does not reset them. */
 export class RateLimits {
   private readonly buckets = new Map<string, { bucket: Bucket; at: number }>();

@@ -70,7 +70,7 @@ export default function Header() {
                   letterSpacing="0.08em"
                   whiteSpace="nowrap"
                 >
-                  <Box as="span" display={{ base: "none", sm: "inline" }}>{t("titleLead")}</Box>{t("titleMain")}
+                  <Box as="span" display={{ base: "none", md: "inline" }}>{t("titleLead")}</Box>{t("titleMain")}
                 </Heading>
                 <Text
                   color="brand.300/30"

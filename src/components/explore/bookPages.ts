@@ -233,6 +233,7 @@ export interface TextPageInfo {
   mark?: { start: number; end: number } | null;
   /** The reader's fragment colour, "#rrggbb". */
   markColor?: string;
+  highlights?: { start: number; end: number; color: string }[];
   /** Start of the occurrence of the phrase the reader is at, if it is on this page. */
   current?: number | null;
 }
@@ -378,6 +379,7 @@ export function makeTextPage(family: string, parchment: THREE.Texture, info: Tex
     ctx.fill();
   };
 
+  for (const h of info.highlights ?? []) wash(fragmentWash(h.color, FRAGMENT_ALPHA.book), spans(Math.max(0, h.start), Math.min(info.content.length, h.end)), 1, 4);
   // The marked fragment lies under the search highlights.
   const markStart = Math.max(0, info.mark?.start ?? 0);
   const markEnd = Math.min(info.content.length, info.mark?.end ?? 0);

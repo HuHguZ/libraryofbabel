@@ -190,7 +190,7 @@
     "textAndAddress": "text & address",
     "loupe": "loupe",
     "loupeTitle": "Loupe (L or a click of the mouse wheel): move it over the book, the wheel changes the magnification, Esc puts it away",
-    "selectHint": "Select part of the text to share it: the link opens this spread with the fragment marked.",
+    "selectHint": "Select text and choose Save highlight to make it visible to everyone. Only its author can recolour or delete it.",
     "copyText": "copy text",
     "copyTextTitle": "Copy the text of page {n}",
     "copied": "copied ✓",
@@ -207,6 +207,11 @@
     "shareFragmentTitle": "Copy a link that opens this spread with the fragment marked",
     "linkCopied": "link copied ✓",
     "clearFragment": "Clear the mark",
+    "saveMark": "Save highlight",
+    "savingMark": "Saving…",
+    "savedMark": "Saved for everyone",
+    "shareMarkChat": "Send to chat",
+    "deleteMark": "Delete highlight",
     "leaveNote": "note",
     "leaveNoteTitle": "Leave a note on the marked fragment — everyone will see it"
   },
@@ -252,6 +257,7 @@
     "cancel": "Cancel",
     "title": "{count, plural, one {# note} other {# notes}} in this gallery",
     "onPage": "to page {page}",
+    "highlight": "Highlight · {count} characters",
     "forget": "delete"
   },
   "Chat": {
