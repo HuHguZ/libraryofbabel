@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { galleryCenter, facingSide, sideWall } from "@/components/explore/geometry";
 import type { StageView } from "@/components/explore/stage/stageStore";
 import { cellKey } from "@/lib/world";
-import type { Pose, View } from "@/lib/online/protocol";
+import type { Pose, Reading, View } from "@/lib/online/protocol";
 import type { Cell } from "@/lib/world";
 
 /** A pose of another visitor as it arrived (t: performance.now() at arrival). */
@@ -12,6 +12,7 @@ export interface Sample {
   p: [number, number, number];
   yaw: number;
   view: View;
+  reading?: Reading;
 }
 
 /** The last few poses of one visitor, oldest first. */
@@ -49,13 +50,14 @@ export function viewOf(view: StageView, yaw: number, spread: number): View {
 
 const sameView = (a: View, b: View) => JSON.stringify(a) === JSON.stringify(b);
 
-/** Worth sending: a step of 2 cm, a turn of 0.01 rad, another gallery or another view. */
+/** Worth sending: a step of 2 cm, a turn of 0.01 rad, another gallery, view or reading activity. */
 export function poseChanged(a: Pose, b: Pose): boolean {
   return (
     a.cell !== b.cell ||
     Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1], a.p[2] - b.p[2]) > 0.02 ||
     Math.abs(wrap(a.yaw - b.yaw)) > 0.01 ||
-    !sameView(a.view, b.view)
+    !sameView(a.view, b.view) ||
+    JSON.stringify(a.reading) !== JSON.stringify(b.reading)
   );
 }
 

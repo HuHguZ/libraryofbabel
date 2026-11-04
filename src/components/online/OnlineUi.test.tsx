@@ -36,6 +36,31 @@ beforeEach(() => { online = createOnlineStore(); online.receive(welcome); push.m
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("online controls", () => {
+  it.each(["en", "ru"] as const)("exposes nickname editing without opening the roster in %s", (locale) => {
+    vi.useFakeTimers();
+    const copy = locale === "ru" ? ruMessages : messages;
+    const sent: unknown[] = []; online.send = message => sent.push(message);
+    ui(<OnlineHud />, locale);
+    fireEvent.click(screen.getByRole("button", { name: locale === "ru" ? "Изменить ник" : "Change name" }));
+    const nick = screen.getByRole("textbox", { name: copy.Online.nick });
+    fireEvent.change(nick, { target: { value: "New reader" } });
+    fireEvent.click(screen.getByRole("button", { name: copy.Online.save }));
+    act(() => vi.advanceTimersByTime(250));
+    expect(sent).toEqual([{ type: "profile", nick: "New reader" }]);
+    expect(screen.getByRole("button", { name: copy.Online.alone }).getAttribute("aria-expanded")).toBe("false");
+  });
+  it.each(["en", "ru"] as const)("renders presence as system text without moderation in %s", (locale) => {
+    const copy = locale === "ru" ? ruMessages : messages;
+    online.receive({ ...welcome, admin: true });
+    online.receive({ type: "activity", activity: { id: "presence:1", action: "joined", nick: "Other", at: new Date().toISOString() } });
+    online.receive({ type: "activity", activity: { id: "presence:2", action: "left", nick: "Other", at: new Date().toISOString() } });
+    ui(<ChatPanel />, locale);
+    fireEvent.click(screen.getByRole("button", { name: copy.Chat.open }));
+    expect(screen.getByText(locale === "ru" ? "Other теперь в Библиотеке" : "Other joined the Library")).not.toBeNull();
+    expect(screen.getByText(locale === "ru" ? "Other покидает Библиотеку" : "Other left the Library")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: copy.Chat.forget })).toBeNull();
+    expect(screen.queryByRole("button", { name: copy.Chat.ban })).toBeNull();
+  });
   it.each(["en", "ru"] as const)("closes chat by a touch-accessible button in %s", (locale) => {
     const copy = locale === "ru" ? ruMessages : messages;
     ui(<ChatPanel />, locale);
@@ -79,7 +104,7 @@ describe("online controls", () => {
       p: [0, 1.6, 0], yaw: 0, view: { kind: "walk", wall: 1 },
     })) });
     ui(<OnlineHud />);
-    fireEvent.click(screen.getByRole("button", { expanded: false }));
+    fireEvent.click(screen.getByRole("button", { name: "31 readers in the Library" }));
     const roster = screen.getByRole("region");
     expect(roster.getAttribute("aria-label")).toBeTruthy();
     expect(getComputedStyle(roster).overflowY).toBe("auto");
@@ -90,12 +115,12 @@ describe("online controls", () => {
     vi.useFakeTimers();
     const sent: unknown[] = []; online.send = (message) => sent.push(message);
     ui(<OnlineHud />);
-    fireEvent.click(screen.getByText(messages.Online.alone));
+    fireEvent.click(screen.getByRole("button", { name: "Change name" }));
     fireEvent.change(screen.getByLabelText("clothes colour"), { target: { value: "#111111" } });
     act(() => vi.advanceTimersByTime(250));
     const nick = screen.getByLabelText(messages.Online.nick);
-    fireEvent.change(nick, { target: { value: "Pending nickname" } }); fireEvent.blur(nick);
-    fireEvent.change(nick, { target: { value: welcome.you.nick } }); fireEvent.blur(nick);
+    fireEvent.change(nick, { target: { value: "Pending nickname" } }); fireEvent.click(screen.getByRole("button", { name: messages.Online.save }));
+    fireEvent.change(nick, { target: { value: welcome.you.nick } }); fireEvent.click(screen.getByRole("button", { name: messages.Online.save }));
     act(() => vi.advanceTimersByTime(5100));
     expect(sent.at(-1)).toEqual({ type: "profile", nick: welcome.you.nick });
   });
@@ -108,7 +133,7 @@ describe("online controls", () => {
       sent.push(message);
     };
     ui(<OnlineHud />);
-    fireEvent.click(screen.getByText(messages.Online.alone));
+    fireEvent.click(screen.getByRole("button", { name: "Change name" }));
     const color = screen.getByLabelText("clothes colour") as HTMLInputElement;
     fireEvent.change(color, { target: { value: "#111111" } });
     act(() => vi.advanceTimersByTime(250));
@@ -117,7 +142,7 @@ describe("online controls", () => {
     act(() => online.receive({ ...welcome, you: { ...welcome.you, color: "#111111" } }));
     expect(color.value).toBe("#abcdef");
     const nick = screen.getByLabelText(messages.Online.nick);
-    fireEvent.change(nick, { target: { value: "Final reader" } }); fireEvent.blur(nick);
+    fireEvent.change(nick, { target: { value: "Final reader" } }); fireEvent.click(screen.getByRole("button", { name: messages.Online.save }));
     act(() => vi.advanceTimersByTime(5100));
     expect(sent).toEqual([{ type: "profile", color: "#111111" }, { type: "profile", color: "#abcdef", nick: "Final reader" }]);
   });

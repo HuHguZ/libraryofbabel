@@ -51,12 +51,14 @@ export interface ShelfDetail {
 
 /** A volume that is off its shelf, and the gallery it belongs to. */
 export interface HiddenVolume {
+  desk?: number;
   level: number;
   col: number;
   wall: number;
   shelf: number;
   volume: number;
 }
+const NO_REMOTE_VOLUMES: readonly HiddenVolume[] = [];
 
 export interface GalleryWorldProps {
   /** Address of the gallery the world is built around (level 0, column 0); every other gallery derives from it. */
@@ -75,6 +77,7 @@ export interface GalleryWorldProps {
   detail: ShelfDetail | null;
   /** A volume that is off its shelf, handed down to its gallery. */
   hidden: HiddenVolume | null;
+  remoteVolumes?: readonly HiddenVolume[];
   /** The shelf of the current gallery the spot light falls on; the spot is dark while null. */
   shelfSpot: { wall: number; shelf: number } | null;
   /** The desk lamp lit in the current gallery, and how brightly; the lamp is dark while null. */
@@ -494,6 +497,7 @@ interface GalleryRoomProps {
   focusShelf?: number;
   /** A volume of this gallery that is off its shelf. */
   hidden?: HiddenVolume;
+  remoteVolumes?: readonly HiddenVolume[];
   /** Wall (1..4) whose desk lamp glows; only set for the gallery the visitor stands in. */
   deskLampWall?: number;
   onHoverBook?: (book: BookRef | null) => void;
@@ -509,12 +513,18 @@ function GalleryRoom({
   detailWall,
   focusShelf,
   hidden,
+  remoteVolumes = NO_REMOTE_VOLUMES,
   deskLampWall,
   onHoverBook,
   onClickBook,
   onHoverShelf,
   onClickShelf,
 }: GalleryRoomProps) {
+  const takenByWall = useMemo(() => {
+    const out = new Map<number, HiddenVolume[]>();
+    for (const v of remoteVolumes) { const list = out.get(v.wall) ?? []; list.push(v); out.set(v.wall, list); }
+    return out;
+  }, [remoteVolumes]);
   const materials = useLibraryMaterials();
   const wallPlane = useMemo(() => {
     const m = materials.wall.clone();
@@ -548,6 +558,7 @@ function GalleryRoom({
               detail={detail && wall === detailWall ? detail : undefined}
               focusShelf={wall === detailWall ? focusShelf : undefined}
               hidden={hidden && wall === hidden.wall ? { shelf: hidden.shelf, volume: hidden.volume } : undefined}
+              hiddenMany={takenByWall.get(wall) ?? NO_REMOTE_VOLUMES}
               interactive={interactive}
               onHoverBook={onHoverBook}
               onClickBook={onClickBook}
@@ -559,7 +570,7 @@ function GalleryRoom({
       })}
       <Railing />
       {WALL_SIDES.map((_, i) => (
-        <ReadingDesk key={i} wall={i + 1} lit={i + 1 === deskLampWall} />
+        <ReadingDesk key={i} wall={i + 1} lit={i + 1 === deskLampWall || remoteVolumes.some(v => v.desk === i + 1)} />
       ))}
       <Lamp position={[2.3, 3.05, 0]} />
       <Lamp position={[-2.3, 3.05, 0]} />
@@ -645,6 +656,7 @@ interface GalleryCellProps {
   interactive: boolean;
   detail: ShelfDetail | null;
   hidden: HiddenVolume | null;
+  remoteVolumes: readonly HiddenVolume[];
   /** Wall (1..4) whose desk lamp glows; only set for the gallery the visitor stands in. */
   deskLampWall?: number;
   /** Called when the cell has loaded and mounted. */
@@ -667,6 +679,7 @@ const GalleryCell = memo(function GalleryCell({
   interactive,
   detail,
   hidden,
+  remoteVolumes,
   deskLampWall,
   onReady,
   onHoverBook,
@@ -693,6 +706,7 @@ const GalleryCell = memo(function GalleryCell({
             detailWall={detail?.wall}
             focusShelf={detailShelf}
             hidden={hidden ?? undefined}
+            remoteVolumes={remoteVolumes}
             deskLampWall={deskLampWall}
             onHoverBook={onHoverBook}
             onClickBook={onClickBook}
@@ -784,6 +798,7 @@ const GalleryWorld = memo(function GalleryWorld({
   interactive,
   detail,
   hidden,
+  remoteVolumes = NO_REMOTE_VOLUMES,
   shelfSpot,
   deskLamp,
   deskLightRef,
@@ -797,6 +812,11 @@ const GalleryWorld = memo(function GalleryWorld({
   onInteract,
   onLockChange,
 }: GalleryWorldProps) {
+  const remoteByCell = useMemo(() => {
+    const out = new Map<string, HiddenVolume[]>();
+    for (const v of remoteVolumes) { const key = `${v.col}:${v.level}`, list = out.get(key) ?? []; list.push(v); out.set(key, list); }
+    return out;
+  }, [remoteVolumes]);
   const addresses = useMemo(() => worldAddresses(worldHex), [worldHex]);
   const [current, setCurrent] = useState<{ level: number; col: number }>(() => initialPlace ?? { level: 0, col: 0 });
   const currentRef = useRef(current);
@@ -903,6 +923,7 @@ const GalleryWorld = memo(function GalleryWorld({
               interactive={here && interactive !== "none"}
               detail={here ? detail : null}
               hidden={hidden && hidden.level === k && hidden.col === c ? hidden : null}
+              remoteVolumes={remoteByCell.get(`${c}:${k}`) ?? NO_REMOTE_VOLUMES}
               deskLampWall={here ? deskLamp?.wall : undefined}
               onReady={here ? reportCellReady : undefined}
               onHoverBook={onHoverBook}

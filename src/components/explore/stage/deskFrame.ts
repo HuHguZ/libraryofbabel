@@ -190,7 +190,7 @@ export function deskBookPose(frame: DeskFrame): BookPose {
   return {
     position: bookToWorld(frame, CLOSED_CENTER),
     quaternion: new THREE.Quaternion().setFromAxisAngle(Y_AXIS, frame.yaw),
-    scale: new THREE.Vector3(1, 1, 1),
+    scale: new THREE.Vector3().setScalar(frame.scale / BOOK_SCALE),
   };
 }
 

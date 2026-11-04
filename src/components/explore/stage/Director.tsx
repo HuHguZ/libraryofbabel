@@ -177,6 +177,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
   const view = useStageSelector((s) => s.view);
   const shelfTitles = useStageSelector((s) => s.shelfTitles);
   const moving = useStageSelector((s) => s.moving);
+  const remoteVolumes = useStageSelector(s => s.remoteVolumes);
 
   const controller = useRef<Controller | null>(null);
   const staging = useRef<Staging | null>(null);
@@ -859,6 +860,7 @@ export default function Director({ controlsRef, on, onReading }: DirectorProps) 
       interactive={moving || off || kind === "desk" ? "none" : kind === "shelf" ? "shelf" : "walk"}
       detail={detail}
       hidden={gap ?? hiddenVolume}
+      remoteVolumes={remoteVolumes}
       shelfSpot={shelfSpot}
       deskLamp={lamp ?? deskLamp}
       deskLightRef={deskLight}
@@ -884,6 +886,7 @@ interface WorldProps {
   interactive: "walk" | "shelf" | "none";
   detail: ShelfDetail | null;
   hidden: HiddenVolume | null;
+  remoteVolumes: HiddenVolume[];
   shelfSpot: { wall: number; shelf: number } | null;
   deskLamp: { wall: number; intensity: number } | null;
   deskLightRef: RefObject<THREE.PointLight | null>;
@@ -894,7 +897,7 @@ interface WorldProps {
 }
 
 /** The world with the materials of its address (the stair and the mirror use them), loading behind its own boundary. */
-function World({ mount, controlsRef, interactive, detail, hidden, shelfSpot, deskLamp, deskLightRef, onCurrentCellReady, on, children }: WorldProps) {
+function World({ mount, controlsRef, interactive, detail, hidden, remoteVolumes, shelfSpot, deskLamp, deskLightRef, onCurrentCellReady, on, children }: WorldProps) {
   const store = useStageStore();
   const seed = useMemo(() => hashString(mount.hex), [mount.hex]);
   // Unmounting controls let go of the mouse without reporting it: the next world must not find it taken.
@@ -910,6 +913,7 @@ function World({ mount, controlsRef, interactive, detail, hidden, shelfSpot, des
           interactive={interactive}
           detail={detail}
           hidden={hidden}
+          remoteVolumes={remoteVolumes}
           shelfSpot={shelfSpot}
           deskLamp={deskLamp}
           deskLightRef={deskLightRef}

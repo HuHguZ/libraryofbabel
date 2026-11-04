@@ -12,6 +12,7 @@ import { useFragmentColor } from "@/lib/fragmentColor";
 import FragmentColorPicker from "./FragmentColorPicker";
 import { HudButton, HudCopyButton } from "./ExploreHud";
 import type { Note } from "@/lib/online/protocol";
+import type { LiveHighlight } from "@/components/online/remoteReading";
 
 const mono = "var(--font-jetbrains), monospace";
 const serif = "var(--font-cormorant), Georgia, serif";
@@ -48,6 +49,7 @@ export interface ReaderTextPanelProps {
   /** Leave a note on the marked fragment; absent while offline. */
   onNote?: () => void;
   notes?: Note[];
+  liveHighlights?: LiveHighlight[];
   savedNote?: Note;
   canEdit?: boolean;
   saving?: boolean;
@@ -164,6 +166,12 @@ export default function ReaderTextPanel(props: ReaderTextPanelProps) {
                     {n.nick} · {n.anchor!.end - n.anchor!.start}
                   </HudButton>
                 ))}
+                {props.liveHighlights?.filter(h => h.page === p).map(h => (
+                  <Text key={h.author} color="parchment.200" fontSize="xs" fontFamily={mono}>
+                    <Box as="span" display="inline-block" w="6px" h="6px" borderRadius="full" bg={h.color} mr={2} />
+                    {t("liveHighlight", { name: h.nick })}
+                  </Text>
+                ))}
               </Flex>
               <BookPage
                 page={p}
@@ -171,7 +179,10 @@ export default function ReaderTextPanel(props: ReaderTextPanelProps) {
                 highlight={query || undefined}
                 current={currentMatch?.page === p ? currentMatch.start : null}
                 fragmentColor={color}
-                highlights={props.notes?.filter(n => n.anchor?.page === p).map(n => ({ ...n.anchor!, color: n.highlightColor ?? n.color }))}
+                highlights={[
+                  ...(props.notes ?? []).filter(n => n.anchor?.page === p).map(n => ({ ...n.anchor!, color: n.highlightColor ?? n.color })),
+                  ...(props.liveHighlights ?? []).filter(h => h.page === p),
+                ]}
                 mark={fragment?.page === p ? fragment : null}
                 selecting={live !== null}
               />

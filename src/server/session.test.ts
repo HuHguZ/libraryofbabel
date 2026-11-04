@@ -53,6 +53,72 @@ function tab(hub: OnlineHub, guest: string, ip = guest) {
   return { client, messages, closes, receive: (value: unknown) => client.receive(JSON.stringify(value)) };
 }
 describe("online sessions", () => {
+  it("relays unsaved selections and loupe positions through roster and ticks, then clears them without storing reading metadata", async () => {
+    const saved: unknown[][] = [];
+    const hub = new OnlineHub(storage({
+      savePlace: async (...args) => { saved.push(args); },
+      addNote: async () => { throw new Error("reading metadata must not become a note"); },
+      addMessage: async () => { throw new Error("reading metadata must not become a chat"); },
+    }), "");
+    const reading = { fragment: { page: 4, start: 2, end: 8, color: "#abcdef" }, loupe: { page: 4, u: 0.2, v: 0.3, power: 3 } };
+    const deskPose = { ...pose, view: { kind: "desk", wall: 1, shelf: 2, volume: 3, page: 4 } };
+    const a = tab(hub, "a"); await a.receive({ type: "hello", lang: "ru" }); await a.receive({ ...deskPose, reading });
+    const store = createOnlineStore(), observer = hub.connect("observer", "observer", message => store.receive(message), () => {});
+    await observer.receive(JSON.stringify({ type: "hello", lang: "ru" }));
+    expect(store.getSnapshot().players.get("a")?.reading).toEqual(reading);
+    expect(store.tracks.get("a")!.at(-1)!.reading).toEqual(reading);
+    hub.tick();
+    await a.receive({ ...deskPose, reading: { loupe: { ...reading.loupe, u: 0.4 } } }); hub.tick();
+    expect(store.tracks.get("a")!.at(-1)!.reading).toEqual({ loupe: { ...reading.loupe, u: 0.4 } });
+    await a.receive({ ...deskPose, reading: { loupe: { ...reading.loupe, u: 2 } } }); hub.tick();
+    expect(store.tracks.get("a")!.at(-1)!.reading?.loupe?.u).toBe(0.4);
+    await a.receive(deskPose); hub.tick();
+    expect(hub.worlds.get("ru")?.players.get("a")?.reading).toBeUndefined();
+    expect(store.tracks.get("a")!.at(-1)!.reading).toBeUndefined();
+    await hub.flush();
+    expect(saved).toEqual([["a", "ru", "0:0", 1]]);
+    expect(a.client.closed).toBe(false);
+  });
+  it("announces the first pose and the last joined tab leaving once per guest and language", async () => {
+    let profile = { nick: "Reader", color: "#b02e3a" }, storedMessages = 0;
+    const hub = new OnlineHub(storage({
+      loadGuest: async () => profile,
+      saveProfile: async (_guest, nick, color) => { profile = { nick, color }; },
+      addMessage: async () => { storedMessages++; return { id: 1, at: "2026-11-04T00:00:00Z" }; },
+    }), "");
+    const observer = tab(hub, "observer"), en = tab(hub, "en"), a = tab(hub, "a"), second = tab(hub, "a");
+    await observer.receive({ type: "hello", lang: "ru" }); await en.receive({ type: "hello", lang: "en" });
+    await a.receive({ type: "hello", lang: "ru" });
+    await a.receive({ type: "profile", nick: "New reader" }); hub.roster();
+    expect(observer.messages.filter(message => message.type === "activity")).toEqual([]);
+    await a.receive(pose); await a.receive(pose);
+    await second.receive({ type: "hello", lang: "ru" }); await second.receive(pose);
+    await a.receive({ type: "hello", lang: "ru" }); hub.roster();
+    a.client.close();
+    expect(observer.messages.filter(message => message.type === "activity")).toMatchObject([
+      { activity: { action: "joined", nick: "New reader" } },
+    ]);
+    second.client.close(); second.client.close();
+    const events = observer.messages.filter(message => message.type === "activity");
+    expect(events).toMatchObject([
+      { activity: { action: "joined", nick: "New reader" } },
+      { activity: { action: "left", nick: "New reader" } },
+    ]);
+    expect(en.messages.some(message => message.type === "activity")).toBe(false);
+    expect(storedMessages).toBe(0);
+  });
+  it("replays presence after a concurrent initial history snapshot", async () => {
+    let release!: (value: null) => void;
+    const hub = new OnlineHub(storage({ lastPlace: guest => guest === "observer" ? new Promise(done => { release = done; }) : Promise.resolve(null) }), "");
+    const store = createOnlineStore(), frames: ServerMessage[] = [];
+    const observer = hub.connect("observer", "observer", frame => { frames.push(frame); store.receive(frame); }, () => {});
+    const hello = observer.receive(JSON.stringify({ type: "hello", lang: "ru" }));
+    await new Promise(done => setImmediate(done));
+    const a = tab(hub, "a"); await a.receive({ type: "hello", lang: "ru" }); await a.receive(pose); a.client.close();
+    release(null); await hello;
+    expect(frames.map(frame => frame.type)).toEqual(["welcome", "players", "history", "activity", "activity"]);
+    expect(store.getSnapshot().messages).toMatchObject([{ action: "joined", nick: "Reader" }, { action: "left", nick: "Reader" }]);
+  });
   it("requires hello first and never resurrects a tab closed during hello", async () => {
     const hub = new OnlineHub(storage(), "admin");
     const early = tab(hub, "early"); await early.receive(pose); expect(early.closes).toEqual([4002]);

@@ -208,6 +208,7 @@
     "linkCopied": "ссылка скопирована ✓",
     "clearFragment": "Снять отметку",
     "saveMark": "Сохранить метку",
+    "liveHighlight": "{name} выделяет",
     "savingMark": "Сохранение…",
     "savedMark": "Сохранено для всех",
     "shareMarkChat": "В чат",
@@ -236,12 +237,15 @@
     "home": "На главную"
   },
   "Online": {
+    "joinReading": "Присоединиться",
+    "bookPage": "стр. {page}",
     "online": "{count, plural, one {# читатель} few {# читателя} many {# читателей} other {# читателя}} в Библиотеке",
     "alone": "Вы одни в Библиотеке",
     "connecting": "Соединение…",
     "offline": "Одиночная Библиотека",
     "you": "Вы",
     "nick": "Имя",
+    "profile": "Изменить ник",
     "save": "Сохранить",
     "walking": "бродит · галерея {x} · этаж {floor}",
     "atShelf": "у полки {shelf} стены {wall} · галерея {x} · этаж {floor}",
@@ -261,6 +265,8 @@
     "forget": "удалить"
   },
   "Chat": {
+    "joined": "{nick} теперь в Библиотеке",
+    "left": "{nick} покидает Библиотеку",
     "close": "Закрыть чат",
     "open": "T — написать",
     "placeholder": "Сообщение для всех в Библиотеке…",
@@ -281,6 +287,9 @@
     "banConfirm": "Заблокировать {nick}?"
   },
   "Map": {
+    "searchReaders": "Поиск по нику",
+    "showMore": "Показать ещё",
+    "readers": "Читатели: {count}",
     "address": "Адрес галереи",
     "walking": "бродит",
     "atShelf": "у полки {shelf} стены {wall}",

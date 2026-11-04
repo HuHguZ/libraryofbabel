@@ -96,13 +96,17 @@ export default function ChatPanel() {
       <Box ref={history} onScroll={(event) => {
         const { scrollHeight, scrollTop, clientHeight } = event.currentTarget;
         following.current = scrollHeight - scrollTop - clientHeight <= 24;
-      }} maxH={open ? "40vh" : "none"} overflowY={open ? "auto" : "visible"} pointerEvents={open ? "auto" : "none"} bg={open ? "rgba(8,8,15,0.8)" : "transparent"} borderRadius="8px" p={open ? 2 : 0}>
-        {shown.map((m) => (
+      }} maxH={open ? "40vh" : "none"} overflowY={open ? "auto" : "visible"} pointerEvents={open ? "auto" : "none"} bg={open ? "rgba(8,8,15,0.9)" : shown.length ? "rgba(8,8,15,0.72)" : "transparent"} borderRadius="8px" p={open || shown.length ? 2 : 0}>
+        {shown.map((m) => "action" in m ? (
+          <Text key={m.id} py="2px" color="parchment.200" overflowWrap="anywhere" textShadow="0 1px 3px #000">
+            {t(m.action, { nick: m.nick })}
+          </Text>
+        ) : (
           <Flex key={m.id} gap={2} py="2px" align="baseline" textShadow="0 0 4px #000">
             <Text as="span" color={m.color} flex="none">
               {m.nick}
             </Text>
-            <Text as="span" color="dark.50" wordBreak="break-word">
+            <Text as="span" color="parchment.100" wordBreak="break-word">
               {m.text}
               {m.place && (
                 <chakra.button ml={2} color="brand.300" cursor="pointer" pointerEvents="auto" onClick={() => router.push(sharedPlaceHref(m.place!))}>
@@ -155,7 +159,7 @@ export default function ChatPanel() {
           </chakra.button>
         </Flex>
       ) : (
-        <chakra.button color="dark.400" mt={1} pointerEvents="auto" cursor="pointer" onClick={() => { stage.commands.release?.(); setOpen(true); }}>
+        <chakra.button color="parchment.100" bg="rgba(8,8,15,0.88)" border="1px solid" borderColor="brand.300/50" borderRadius="6px" px={3} py={1.5} mt={2} fontWeight="medium" pointerEvents="auto" cursor="pointer" onClick={() => { stage.commands.release?.(); setOpen(true); }}>
           {t("open")}
         </chakra.button>
       )}

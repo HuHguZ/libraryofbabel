@@ -25,6 +25,7 @@ export interface BookcaseProps {
   focusShelf?: number;
   /** A volume taken off its shelf: drawn nowhere (its instance is zero-scaled, no DetailedBook either). */
   hidden?: { shelf: number; volume: number };
+  hiddenMany?: readonly { shelf: number; volume: number }[];
   interactive?: boolean;
   onHoverBook?: (book: BookRef | null) => void;
   onClickBook?: (book: BookRef) => void;
@@ -113,6 +114,7 @@ export default function Bookcase({
   detail,
   focusShelf,
   hidden,
+  hiddenMany,
   interactive = true,
   onHoverBook,
   onClickBook,
@@ -141,18 +143,19 @@ export default function Bookcase({
 
   const hiddenShelf = hidden?.shelf;
   const hiddenVolume = hidden?.volume;
+  const isTaken = useCallback((shelf: number, volume: number) => (shelf === hiddenShelf && volume === hiddenVolume) || !!hiddenMany?.some(b => b.shelf === shelf && b.volume === volume), [hiddenShelf, hiddenVolume, hiddenMany]);
   // A stable identity (changing only with the shelf/volume that's off its shelf) keeps the effect below from
   // rewriting every instance's matrix on every unrelated re-render.
   const writeInstance = useCallback(
     (mesh: THREE.InstancedMesh, book: BookPlacement, index: number, pulled: boolean) => {
-      const taken = book.shelf === hiddenShelf && book.volume === hiddenVolume;
+      const taken = isTaken(book.shelf, book.volume);
       dummy.position.set(book.x, book.y, book.z + (pulled ? PULL_OUT : 0));
       dummy.scale.set(taken ? 0 : 1, taken ? 0 : book.scaleY, taken ? 0 : 1);
       dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
     },
-    [hiddenShelf, hiddenVolume]
+    [isTaken]
   );
 
   useLayoutEffect(() => {
@@ -230,7 +233,7 @@ export default function Bookcase({
     const books: { volume: number; tint: number; x: number; y: number; z: number; scaleY: number; spine: THREE.MeshStandardMaterial; gilt: THREE.CanvasTexture }[] = [];
     detail.titles.forEach((title, i) => {
       const volume = i + 1;
-      if (detail.shelf === hiddenShelf && volume === hiddenVolume) return;
+      if (isTaken(detail.shelf, volume)) return;
       // The volume's own placement: the same binding and height as on the other shelves and in flight.
       const { tint, x, y, z, scaleY } = placements.find((b) => b.shelf === detail.shelf && b.volume === volume)!;
       const gilt = makeTitleGilt(title.trim() || common("volumeN", { n: volume }), family);
@@ -241,7 +244,7 @@ export default function Bookcase({
       books.push({ volume, tint, x, y, z, scaleY, spine, gilt });
     });
     return books;
-  }, [detail, family, placements, materials, common, hiddenShelf, hiddenVolume]);
+  }, [detail, family, placements, materials, common, isTaken]);
 
   useEffect(() => {
     return () => {

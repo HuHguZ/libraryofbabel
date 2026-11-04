@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Box } from "@chakra-ui/react";
 import { findMatches } from "@/lib/alphabet";
 import { DEFAULT_FRAGMENT_COLOR, FRAGMENT_ALPHA, fragmentWash } from "@/lib/fragmentColor";
@@ -76,7 +76,10 @@ export function segmentText(content: string, query: string, mark: BookPageProps[
 }
 
 export default function BookPage({ content, highlight, mark, selecting, page, current = null, fragmentColor = DEFAULT_FRAGMENT_COLOR, highlights }: BookPageProps) {
-  const segments = useMemo(() => segmentText(content, highlight ?? "", mark, current, highlights), [content, highlight, mark, current, highlights]);
+  const [heldHighlights, setHeldHighlights] = useState(highlights);
+  // Splitting text nodes during a drag collapses the browser's native selection.
+  if (!selecting && heldHighlights !== highlights) setHeldHighlights(highlights);
+  const segments = useMemo(() => segmentText(content, highlight ?? "", mark, current, heldHighlights), [content, highlight, mark, current, heldHighlights]);
   const tint = { wash: fragmentWash(fragmentColor, FRAGMENT_ALPHA.panel), selection: fragmentWash(fragmentColor, FRAGMENT_ALPHA.selection) };
   return (
     <Box position="relative" maxW="900px" mx="auto">

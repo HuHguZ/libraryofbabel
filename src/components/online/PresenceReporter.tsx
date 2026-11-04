@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import type { Pose } from "@/lib/online/protocol";
+import { DEFAULT_FRAGMENT_COLOR } from "@/lib/fragmentColor";
 import { useStageStore } from "@/components/explore/stage/StageProvider";
 import { useOnlineStore } from "./OnlineProvider";
 import { poseChanged, presenceOf, viewOf } from "./presence";
@@ -26,6 +27,11 @@ export default function PresenceReporter() {
     const pose = stage.commands.visitorPose?.();
     if (!place || !view || !pose) return;
     const next = presenceOf(place, pose.position, pose.yaw, viewOf(view, pose.yaw, desk?.spread ?? 0));
+    if (next.view.kind === "desk" && next.view.page > 0) {
+      const fragment = desk?.mark ? { ...desk.mark, color: desk.markColor ?? DEFAULT_FRAGMENT_COLOR } : undefined;
+      const loupe = desk?.loupe ? stage.commands.loupePose?.() : null;
+      if (fragment || loupe) next.reading = { ...(fragment && { fragment }), ...(loupe && { loupe }) };
+    }
     if (sent.current && !poseChanged(sent.current, next)) return;
     sent.current = next;
     online.send({ type: "pose", ...next });

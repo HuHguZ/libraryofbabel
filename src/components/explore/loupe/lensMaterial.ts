@@ -10,6 +10,9 @@ import * as THREE from "three";
 export interface LensUniforms {
   /** The magnified picture: the square around the lens, `power` times closer. */
   uView: { value: THREE.Texture | null };
+  /** Peer lenses use the owner's crop-to-page-UV homography with the page texture itself. */
+  uPageSample: { value: THREE.Matrix3 };
+  uUsePageSample: { value: boolean };
   /** The model's AO / roughness / metal map; its roughness shows where the glass is smudged and scratched. */
   uSurface: { value: THREE.Texture | null };
   /** Centre of the lens on the target being drawn into, in pixels from its bottom left corner. */
@@ -46,6 +49,8 @@ void main() {
 const fragmentShader = /* glsl */ `
 uniform sampler2D uView;
 uniform sampler2D uSurface;
+uniform mat3 uPageSample;
+uniform bool uUsePageSample;
 uniform vec2 uCenter;
 uniform float uRadius;
 uniform float uBarrel;
@@ -57,9 +62,17 @@ varying vec2 vUv;
 varying vec3 vViewPosition;
 varying vec3 vViewNormal;
 
+vec3 sampleView(vec2 at) {
+  if (uUsePageSample) {
+    vec3 page = uPageSample * vec3(at, 1.0);
+    return texture2D(uView, page.xy / page.z).rgb;
+  }
+  return texture2D(uView, 0.5 + 0.5 * at).rgb;
+}
+
 void main() {
   // Where this fragment is within the lens on the screen (the unit circle), and how far from the centre of the glass.
-  vec2 q = (gl_FragCoord.xy - uCenter) / uRadius;
+  vec2 q = uUsePageSample ? vLocal : (gl_FragCoord.xy - uCenter) / uRadius;
   float r = clamp(length(vLocal), 0.0, 1.0);
   float r2 = r * r;
 
@@ -67,9 +80,9 @@ void main() {
   vec2 at = q * (1.0 - uBarrel * r2 * r2);
   float split = uAberration * r2 * r2;
   vec3 color = vec3(
-    texture2D(uView, 0.5 + 0.5 * at * (1.0 + split)).r,
-    texture2D(uView, 0.5 + 0.5 * at).g,
-    texture2D(uView, 0.5 + 0.5 * at * (1.0 - split)).b
+    sampleView(at * (1.0 + split)).r,
+    sampleView(at).g,
+    sampleView(at * (1.0 - split)).b
   );
 
   // Tinted glass, shaded where the frame holds it.
@@ -98,6 +111,8 @@ export type LensMaterial = THREE.ShaderMaterial & { uniforms: LensUniforms };
 export function createLensMaterial(lens: { center: { x: number; y: number }; radius: number }, surface: THREE.Texture | null): LensMaterial {
   const uniforms: LensUniforms = {
     uView: { value: null },
+    uPageSample: { value: new THREE.Matrix3() },
+    uUsePageSample: { value: false },
     uSurface: { value: surface },
     uCenter: { value: new THREE.Vector2() },
     uRadius: { value: 1 },

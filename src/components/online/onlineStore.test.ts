@@ -41,6 +41,57 @@ describe("onlineStore", () => {
     expect(listener).not.toHaveBeenCalled();
     expect(store.tracks.get("a")!.at(-1)).toMatchObject({ t: 500, cell: { x: 1n, floor: 2n }, p: [1, 1.6, 0] });
   });
+  it("publishes fragment changes and clearing while keeping loupe-only motion out of React", () => {
+    const store = createOnlineStore();
+    store.receive({ type: "welcome", you: me, last: null, admin: false });
+    const player = { ...other("a"), view: { kind: "desk" as const, wall: 1, shelf: 2, volume: 3, page: 4 } };
+    const fragment = { page: 4, start: 2, end: 8, color: "#abcdef" }, loupe = { page: 4, u: 0.2, v: 0.3, power: 3 };
+    store.receive({ type: "players", list: [{ ...player, reading: { fragment, loupe } }] }, 0);
+    const initial = store.getSnapshot().selectionsVersion;
+    expect(initial).toBe(1);
+    expect(store.tracks.get("a")!.at(-1)!.reading).toEqual({ fragment, loupe });
+    const listener = vi.fn(); store.subscribe(listener);
+    store.receive({ type: "poses", list: [{ ...player, reading: { fragment, loupe: { ...loupe, u: 0.4 } } }] }, 100);
+    expect(store.tracks.get("a")!.at(-1)!.reading?.loupe?.u).toBe(0.4);
+    expect(store.getSnapshot().selectionsVersion).toBe(initial);
+    expect(listener).not.toHaveBeenCalled();
+    store.receive({ type: "poses", list: [{ ...player, reading: { fragment: { ...fragment, end: 9 } } }] }, 200);
+    expect(store.getSnapshot().selectionsVersion).toBe(initial + 1);
+    expect(listener).toHaveBeenCalledTimes(1);
+    store.receive({ type: "poses", list: [player] }, 300);
+    expect(store.tracks.get("a")!.at(-1)!.reading).toBeUndefined();
+    expect(store.getSnapshot().selectionsVersion).toBe(initial + 2);
+  });
+  it("updates existing roster selections and clears them on removal and offline", () => {
+    const store = createOnlineStore();
+    store.receive({ type: "welcome", you: me, last: null, admin: false });
+    const player = { ...other("a"), view: { kind: "desk" as const, wall: 1, shelf: 2, volume: 3, page: 4 } };
+    const fragment = { page: 4, start: 2, end: 8, color: "#abcdef" };
+    store.receive({ type: "players", list: [player] }, 0);
+    store.receive({ type: "players", list: [{ ...player, reading: { fragment } }] }, 100);
+    expect(store.tracks.get("a")!.at(-1)!.reading?.fragment).toEqual(fragment);
+    expect(store.getSnapshot().selectionsVersion).toBe(1);
+    store.receive({ type: "players", list: [] });
+    expect(store.tracks.has("a")).toBe(false);
+    expect(store.getSnapshot().selectionsVersion).toBe(2);
+    store.receive({ type: "players", list: [{ ...player, reading: { fragment } }] });
+    store.setStatus("offline");
+    expect(store.tracks.size).toBe(0);
+    expect(store.getSnapshot().selectionsVersion).toBe(4);
+  });
+  it("repaints selection context changes and explicit departure without reacting to loupe removal", () => {
+    const store = createOnlineStore();
+    store.receive({ type: "welcome", you: me, last: null, admin: false });
+    const player = { ...other("a"), view: { kind: "desk" as const, wall: 1, shelf: 2, volume: 3, page: 4 }, reading: { fragment: { page: 4, start: 2, end: 8, color: "#abcdef" } } };
+    store.receive({ type: "players", list: [player] });
+    store.receive({ type: "poses", list: [{ ...player, view: { ...player.view, volume: 4 } }] });
+    expect(store.getSnapshot().selectionsVersion).toBe(2);
+    store.receive({ type: "left", id: "a" });
+    expect(store.getSnapshot().selectionsVersion).toBe(3);
+    store.receive({ type: "players", list: [{ ...player, reading: { loupe: { page: 4, u: 0.2, v: 0.3, power: 3 } } }] });
+    store.setStatus("offline");
+    expect(store.getSnapshot().selectionsVersion).toBe(3);
+  });
 
   it("forgets who left, and everyone when the connection goes", () => {
     const store = createOnlineStore();
@@ -130,6 +181,19 @@ describe("notes and messages", () => {
     expect(messages[0].id).toBe(2);
     store.receive({ type: "forgotten", kind: "chat", id: 201 });
     expect(store.getSnapshot().messages.at(-1)!.id).toBe(200);
+  });
+
+  it("bounds presence and chat in one buffer without deleting presence as chat", () => {
+    const store = createOnlineStore();
+    store.receive(welcome);
+    store.receive({ type: "history", messages: Array.from({ length: 200 }, (_, i) => message(i + 1)) });
+    const activity = { id: "presence:201", action: "joined" as const, nick: "Reader", at: "2026-11-04T00:00:00Z" };
+    store.receive({ type: "activity", activity });
+    store.receive({ type: "message", message: message(201) });
+    expect(store.getSnapshot().messages).toHaveLength(200);
+    expect(store.getSnapshot().messages[0].id).toBe(3);
+    store.receive({ type: "forgotten", kind: "chat", id: 201 });
+    expect(store.getSnapshot().messages.at(-1)).toEqual(activity);
   });
 
   it("remembers the last refusal", () => {

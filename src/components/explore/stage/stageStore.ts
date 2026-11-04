@@ -1,7 +1,9 @@
 import type { WalkPose } from "./poses";
 import type { BookRef } from "../Bookcase";
-import type { WorldPlace } from "../HexGalleryScene";
+import type { WorldPlace, HiddenVolume } from "../HexGalleryScene";
 import type { ColoredFragment } from "@/lib/fragment";
+import type { Camera } from "three";
+import type { LoupeSample, Reading } from "@/lib/online/protocol";
 
 export interface BookAddress {
   hex: string;
@@ -27,6 +29,8 @@ export interface DeskInputs {
   mark?: { page: number; start: number; end: number } | null;
   markColor?: string;
   highlights?: ColoredFragment[];
+  liveHighlights?: ColoredFragment[];
+  getLoupes?: () => { page: number; u: number; v: number; power: number; color: string }[];
   markFocusToken?: string;
   loupe: boolean;
 }
@@ -47,6 +51,7 @@ export interface StageHandlers {
 }
 
 export interface StageSnapshot {
+  remoteVolumes: HiddenVolume[];
   view: StageView | null; // requested by the current page
   shelfTitles: { hex: string; wall: number; shelf: number; titles: string[] } | null;
   desk: DeskInputs | null; // last inputs; never cleared on page unmount
@@ -58,6 +63,8 @@ export interface StageSnapshot {
 }
 
 export interface StageCommands {
+  loupePose?(): NonNullable<Reading["loupe"]> | null;
+  pageAt?(x: number, y: number, camera: Camera, crop?: { x: number; y: number }): { page: number; u: number; v: number; sample?: LoupeSample } | null;
   visitorPose?(): WalkPose | null;
   release?(): void;
   lookAt?(yaw: number, pitch?: number): void;
@@ -70,7 +77,7 @@ export interface StageStore {
   setView(view: StageView): void; // no-op (no emit) when deep-equal to the current view
   setShelfTitles(v: StageSnapshot["shelfTitles"]): void;
   setDesk(inputs: DeskInputs): void;
-  patch(partial: Partial<Pick<StageSnapshot, "place" | "ready" | "moving" | "locked" | "origin">>): void; // stage-side reports; no emit when nothing changed
+  patch(partial: Partial<Pick<StageSnapshot, "place" | "ready" | "moving" | "locked" | "origin" | "remoteVolumes">>): void; // stage-side reports; no emit when nothing changed
   handlers: { current: StageHandlers }; // latest handlers of the active page (not part of the snapshot)
   commands: StageCommands; // registered by the stage
 }
@@ -125,6 +132,8 @@ const sameDesk = (a: DeskInputs | null, b: DeskInputs): boolean =>
   Object.is(a.matchStep, b.matchStep) &&
   Object.is(a.markColor, b.markColor) &&
   Object.is(a.highlights, b.highlights) &&
+  Object.is(a.liveHighlights, b.liveHighlights) &&
+  Object.is(a.getLoupes, b.getLoupes) &&
   Object.is(a.markFocusToken, b.markFocusToken) &&
   Object.is(a.loupe, b.loupe);
 
@@ -146,6 +155,7 @@ const sameShelfTitles = (a: StageSnapshot["shelfTitles"], b: StageSnapshot["shel
  */
 export function createStageStore(): StageStore {
   let snapshot: StageSnapshot = {
+    remoteVolumes: [],
     view: null,
     shelfTitles: null,
     desk: null,
@@ -189,6 +199,7 @@ export function createStageStore(): StageStore {
     patch(partial) {
       let changed = false;
       const next: StageSnapshot = { ...snapshot };
+      if (partial.remoteVolumes && partial.remoteVolumes !== snapshot.remoteVolumes) { next.remoteVolumes = partial.remoteVolumes; changed = true; }
 
       if ("place" in partial) {
         const value = partial.place ?? null;

@@ -1,9 +1,33 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { segmentText } from "./BookPage";
 import BookPage from "./BookPage";
 import { render, cleanup } from "@testing-library/react";
 import { ChakraProvider } from "@chakra-ui/react";
 import { system } from "@/lib/theme";
+
+afterEach(() => { cleanup(); document.getSelection()?.removeAllRanges(); });
+
+it("holds shared highlight boundaries during a native selection and applies the latest ones afterwards", () => {
+  const draw = (selecting: boolean, highlights: { start: number; end: number; color: string }[]) => <ChakraProvider value={system}><BookPage page={4} content="abcdefgh" selecting={selecting} highlights={highlights} /></ChakraProvider>;
+  const initial = [{ start: 0, end: 2, color: "#123456" }];
+  const view = render(draw(false, initial));
+  view.rerender(draw(true, initial));
+  const page = document.querySelector('[data-page-text="4"]')!;
+  const node = page.lastChild!;
+  const range = document.createRange(); range.setStart(node, 0); range.setEnd(node, 4);
+  const selection = document.getSelection()!; selection.addRange(range);
+  view.rerender(draw(true, [{ start: 1, end: 5, color: "#abcdef" }]));
+  const latest = [{ start: 4, end: 6, color: "#112233" }];
+  view.rerender(draw(true, latest));
+  expect(selection.toString()).toBe("cdef");
+  expect(selection.getRangeAt(0).startContainer).toBe(node);
+  expect(selection.getRangeAt(0).endContainer).toBe(node);
+  expect(page.querySelector("mark[data-saved-colors]")?.textContent).toBe("ab");
+  view.rerender(draw(false, latest));
+  expect(page.querySelector("mark[data-saved-colors]")?.textContent).toBe("ef");
+  view.rerender(draw(false, []));
+  expect(page.querySelector("mark[data-saved-colors]")).toBeNull();
+});
 
 const pieces = (content: string, query: string, mark: { start: number; end: number } | null, current: number | null) =>
   segmentText(content, query, mark, current).map((s) => [s.text, [s.match && "match", s.current && "current", s.mark && "mark"].filter(Boolean).join(" ")]);

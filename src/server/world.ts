@@ -16,10 +16,10 @@ export class World {
     this.tabs.delete(id); this.moved.delete(id);
     return this.players.delete(id);
   }
-  move(id: string, pose: Pose): void { const player = this.players.get(id); if (player) { Object.assign(player, pose); this.moved.add(id); } }
+  move(id: string, pose: Pose): void { const player = this.players.get(id); if (player) { Object.assign(player, pose, { reading: pose.reading }); this.moved.add(id); } }
   rename(id: string, nick: string, color: string): void { const player = this.players.get(id); if (player) Object.assign(player, { nick, color }); }
   takeMoves(): ServerMessage | null {
-    const list = [...this.moved].flatMap(id => { const player = this.players.get(id); return player ? [{ id, cell: player.cell, p: player.p, yaw: player.yaw, view: player.view }] : []; });
+    const list = [...this.moved].flatMap(id => { const player = this.players.get(id); return player ? [{ id, cell: player.cell, p: player.p, yaw: player.yaw, view: player.view, reading: player.reading }] : []; });
     this.moved.clear();
     return list.length ? { type: "poses", list } : null;
   }

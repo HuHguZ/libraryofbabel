@@ -1,30 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Box, Flex, Text, chakra } from "@chakra-ui/react";
+import { Box, Flex, Input, Text, chakra } from "@chakra-ui/react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
-import { ROW, galleryCenter } from "@/components/explore/geometry";
+import { galleryCenter } from "@/components/explore/geometry";
 import { useStageStore } from "@/components/explore/stage/StageProvider";
 import type { StageStore } from "@/components/explore/stage/stageStore";
 import { hasBit } from "@/lib/online/fog";
-import type { Note, Player } from "@/lib/online/protocol";
+import type { Note } from "@/lib/online/protocol";
 import { CENTRE, bitCell, chunkKeyOf, cellBit, formatCoordinate, parseCellKey, sameCell, type Cell } from "@/lib/world";
 import { useOnlineStore } from "./OnlineProvider";
 import type { OnlineStore } from "./onlineStore";
 import { FLOOR_RATIO, cellAtPoint, pan, pointOf, viewAround, visibleChunks, zoomAt, type MapView } from "./mapView";
+import { GROUP_RADIUS, alongOf, currentReaders, groupReaders, pickReaderGroup, type MapReader, type ReaderGroup } from "./map";
 import { noteHref, placeHref, viewHref } from "./teleport";
 
 const COLOURS = { fog: "#08070b", explored: "#3a2f1d", grid: "rgba(201, 168, 76, 0.09)", centre: "#c9a84c", me: "#f2d58a", pick: "#f2d58a" };
 const MINI_SCALE = 10;
 const FULL_SCALE = 22;
+const READER_PAGE_SIZE = 50;
 /** How close (px) a click must be to a reader's dot to pick the reader rather than the gallery. */
 const PICK_RADIUS = 9;
 
-type Target = { kind: "gallery"; cell: Cell } | { kind: "player"; player: Player; cell: Cell } | { kind: "note"; note: Note; cell: Cell };
-
-/** Where along its gallery an eye is, as a fraction of a gallery (the middle is 0.5; the vestibule east lies past 1 − ε). */
-const alongOf = (p: [number, number, number]) => 0.5 + (p[0] * ROW.nx + p[2] * ROW.nz) / ROW.period;
+type Target = { kind: "gallery"; cell: Cell } | { kind: "readers"; ids: string[]; cell: Cell } | { kind: "note"; note: Note; cell: Cell };
 
 /** Me on the map: my gallery and where along it I stand. */
 function myPoint(stage: StageStore): { cell: Cell; along: number } | null {
@@ -36,18 +35,7 @@ function myPoint(stage: StageStore): { cell: Cell; along: number } | null {
   return { cell: place.cell, along: alongOf([pose.position.x - cx, pose.position.y - cy, pose.position.z - cz]) };
 }
 
-/** The other readers on the map: their newest pose. */
-function readers(online: OnlineStore): { player: Player; cell: Cell; along: number }[] {
-  const out: { player: Player; cell: Cell; along: number }[] = [];
-  for (const player of online.getSnapshot().players.values()) {
-    const last = online.tracks.get(player.id)?.at(-1);
-    if (last) out.push({ player: { ...player, view: last.view }, cell: last.cell, along: alongOf(last.p) });
-  }
-
-  return out;
-}
-
-function draw(ctx: CanvasRenderingContext2D, w: number, h: number, view: MapView, online: OnlineStore, stage: StageStore, mode: "mini" | "full", picked: Cell | null) {
+function draw(ctx: CanvasRenderingContext2D, w: number, h: number, view: MapView, online: OnlineStore, stage: StageStore, mode: "mini" | "full", picked: Cell | null, groups: readonly ReaderGroup[]) {
   const cw = view.scale;
   const ch = view.scale * FLOOR_RATIO;
   ctx.fillStyle = COLOURS.fog;
@@ -55,7 +43,8 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, view: MapView
 
   // Explored galleries.
   ctx.fillStyle = COLOURS.explored;
-  for (const key of visibleChunks(view, w, h)) {
+  const chunks = visibleChunks(view, w, h);
+  for (const key of chunks) {
     const bits = online.chunks.get(key);
     const chunk = bits && parseCellKey(key);
     if (!bits || !chunk) continue;
@@ -67,7 +56,7 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, view: MapView
   }
 
   const pins = new Set<string>();
-  for (const key of visibleChunks(view, w, h)) for (const note of online.notes.get(key) ?? []) {
+  for (const key of chunks) for (const note of online.notes.get(key) ?? []) {
     if (pins.has(note.cell)) continue;
     pins.add(note.cell);
     const cell = parseCellKey(note.cell);
@@ -116,22 +105,34 @@ function draw(ctx: CanvasRenderingContext2D, w: number, h: number, view: MapView
   // The others, then me on top.
   const r = Math.max(3, cw / 6);
   ctx.font = "11px var(--font-jetbrains), monospace";
-  for (const { player, cell, along } of readers(online)) {
-    const [x, y] = pointOf(view, w, h, cell, along, 0.35);
-    if (x < -r || x > w + r || y < -r || y > h + r) continue;
-    ctx.fillStyle = player.color;
+  for (const { x, y, readers } of groups) {
+    const crowded = readers.length > 1;
+    const player = readers[0].player;
+    ctx.fillStyle = crowded ? COLOURS.fog : player.color;
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(x, y, crowded ? GROUP_RADIUS : r, 0, Math.PI * 2);
     ctx.fill();
-    if (mode === "full" && cw >= 16) ctx.fillText(player.nick, x + r + 3, y + 4);
+    if (crowded) {
+      ctx.strokeStyle = COLOURS.centre;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = COLOURS.me;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(readers.length), x, y);
+      ctx.textAlign = "start";
+      ctx.textBaseline = "alphabetic";
+    } else if (mode === "full" && cw >= 16 && groups.length < 30) ctx.fillText(player.nick, x + r + 3, y + 4);
   }
   const me = myPoint(stage);
   if (me) {
     const [x, y] = pointOf(view, w, h, me.cell, me.along, 0.35);
+    const group = pickReaderGroup(groups, x, y);
+    const crowded = group && group.readers.length > 1;
     ctx.strokeStyle = COLOURS.me;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(x, y, r + 2, 0, Math.PI * 2);
+    ctx.arc(crowded ? group.x : x, crowded ? group.y : y, crowded ? GROUP_RADIUS + 3 : r + 2, 0, Math.PI * 2);
     ctx.stroke();
   }
 }
@@ -148,9 +149,36 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
   const canvas = useRef<HTMLCanvasElement>(null);
   const view = useRef<MapView | null>(null);
   const picked = useRef<Cell | null>(null);
+  const groups = useRef<ReaderGroup[]>([]);
+  const dirty = useRef(true);
+  const panel = useRef<HTMLDivElement>(null);
   const [target, setTarget] = useState<(Target & { x: number; y: number }) | null>(null);
+  const [selected, setSelected] = useState<MapReader[]>([]);
+  const [readerQuery, setReaderQuery] = useState("");
+  const [readerLimit, setReaderLimit] = useState(READER_PAGE_SIZE);
+  const selectedIds = target?.kind === "readers" ? target.ids : null;
+  const query = readerQuery.trim().toLowerCase();
+  const matchingReaders = query ? selected.filter(({ player }) => player.nick.toLowerCase().includes(query)) : selected;
 
-  // The drawing loop: the minimap ten times a second, centred on the visitor; the full map every frame.
+  useEffect(() => { panel.current?.focus(); }, [target]);
+
+  useEffect(() => {
+    if (!selectedIds) return;
+    const timer = setInterval(() => {
+      const el = canvas.current;
+      if (!el || !view.current) return;
+      const anchor = selectedIds.find((id) => online.getSnapshot().players.has(id));
+      const next = groupReaders(currentReaders(online), view.current, el.clientWidth, el.clientHeight)
+        .find((group) => group.readers.some((reader) => reader.player.id === anchor))?.readers ?? [];
+      setSelected((previous) => previous.length === next.length && previous.every((reader, i) => {
+        const other = next[i];
+        return reader.player.id === other.player.id && reader.player.nick === other.player.nick && reader.player.color === other.player.color && sameCell(reader.cell, other.cell) && JSON.stringify(reader.player.view) === JSON.stringify(other.player.view);
+      }) ? previous : next);
+    }, 100);
+    return () => clearInterval(timer);
+  }, [online, selectedIds]);
+
+  // Poll incoming poses at 10 Hz; dragging, zooming and picking draw on the next animation frame.
   useEffect(() => {
     const el = canvas.current;
     const ctx = el?.getContext("2d");
@@ -160,7 +188,8 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
     let asked = 0;
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
-      if (mode === "mini" && now - last < 100) return;
+      if (!dirty.current && now - last < 100) return;
+      dirty.current = false;
       last = now;
       const dpr = window.devicePixelRatio || 1;
       const w = el.clientWidth;
@@ -176,7 +205,8 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
         asked = now;
         online.watch(visibleChunks(view.current, w, h));
       }
-      draw(ctx, w, h, view.current, online, stage, mode, picked.current);
+      groups.current = groupReaders(currentReaders(online), view.current, w, h);
+      draw(ctx, w, h, view.current, online, stage, mode, picked.current, groups.current);
     };
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
@@ -187,6 +217,12 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
     const el = canvas.current;
     if (!el || mode !== "full") return;
     let drag: { x: number; y: number; moved: number } | null = null;
+    const clearTarget = () => {
+      setTarget(null);
+      setReaderQuery("");
+      setReaderLimit(READER_PAGE_SIZE);
+      picked.current = null;
+    };
     const local = (e: { clientX: number; clientY: number }) => {
       const r = el.getBoundingClientRect();
       return [e.clientX - r.left, e.clientY - r.top] as const;
@@ -199,19 +235,16 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
       if (!view.current) return;
       if (!drag) {
         const [px, py] = local(e);
-        const hit = readers(online).find(({ cell, along }) => {
-          const [x, y] = pointOf(view.current!, el.clientWidth, el.clientHeight, cell, along, 0.35);
-          return Math.hypot(x - px, y - py) < PICK_RADIUS;
-        });
-        el.title = hit?.player.nick ?? "";
+        const hit = pickReaderGroup(groups.current, px, py);
+        el.title = hit ? hit.readers.length === 1 ? hit.readers[0].player.nick : t("readers", { count: hit.readers.length }) : "";
         return;
       }
       const dx = e.clientX - drag.x;
       const dy = e.clientY - drag.y;
       drag = { x: e.clientX, y: e.clientY, moved: drag.moved + Math.hypot(dx, dy) };
       view.current = pan(view.current, dx, dy);
-      setTarget(null);
-      picked.current = null;
+      dirty.current = true;
+      clearTarget();
     };
     const up = (e: PointerEvent) => {
       const click = drag && drag.moved < 4;
@@ -220,10 +253,7 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
       const [px, py] = local(e);
       const w = el.clientWidth;
       const h = el.clientHeight;
-      const hit = readers(online).find(({ cell, along }) => {
-        const [x, y] = pointOf(view.current!, w, h, cell, along, 0.35);
-        return Math.hypot(x - px, y - py) < PICK_RADIUS;
-      });
+      const hit = pickReaderGroup(groupReaders(currentReaders(online), view.current, w, h), px, py);
       let pin: { note: Note; cell: Cell } | undefined;
       if (!hit) for (const key of visibleChunks(view.current, w, h)) {
         for (const note of online.notes.get(key) ?? []) {
@@ -234,17 +264,21 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
         }
         if (pin) break;
       }
-      const cell = hit?.cell ?? pin?.cell ?? cellAtPoint(view.current, w, h, px, py);
+      const cell = hit?.readers[0].cell ?? pin?.cell ?? cellAtPoint(view.current, w, h, px, py);
       picked.current = cell;
-      setTarget(hit ? { kind: "player", player: hit.player, cell, x: px, y: py } : pin ? { kind: "note", note: pin.note, cell, x: px, y: py } : { kind: "gallery", cell, x: px, y: py });
+      dirty.current = true;
+      setReaderQuery("");
+      setReaderLimit(READER_PAGE_SIZE);
+      if (hit) setSelected(hit.readers);
+      setTarget(hit ? { kind: "readers", ids: hit.readers.map((reader) => reader.player.id), cell, x: px, y: py } : pin ? { kind: "note", note: pin.note, cell, x: px, y: py } : { kind: "gallery", cell, x: px, y: py });
     };
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       if (!view.current) return;
       const [px, py] = local(e);
       view.current = zoomAt(view.current, Math.exp(-e.deltaY * 0.0015), px, py, el.clientWidth, el.clientHeight);
-      setTarget(null);
-      picked.current = null;
+      dirty.current = true;
+      clearTarget();
     };
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointermove", move);
@@ -259,7 +293,7 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
       el.removeEventListener("pointercancel", cancel);
       el.removeEventListener("wheel", wheel);
     };
-  }, [mode, online]);
+  }, [mode, online, t]);
 
   const go = (href: string) => {
     onClose?.();
@@ -270,6 +304,11 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
     return bits ? hasBit(bits, cellBit(cell)) : false;
   };
   const me = target && myPoint(stage);
+  const panelTop = Math.max(4, Math.min((target?.y ?? 0) + 12, (canvas.current?.clientHeight ?? 320) - 320));
+  const visit = (id: string, book: boolean) => {
+    const reader = currentReaders(online).find((reader) => reader.player.id === id);
+    if (reader) go(book ? viewHref(reader.cell, reader.player.view) : placeHref(reader.cell, reader.player.view.wall));
+  };
 
   return (
     <Box position="relative" w="100%" h="100%">
@@ -289,18 +328,19 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
           const el = event.currentTarget;
           if (!view.current) return;
           const rect = el.getBoundingClientRect();
-          const hit = readers(online).find(({ cell, along }) => {
-            const [x, y] = pointOf(view.current!, el.clientWidth, el.clientHeight, cell, along, 0.35);
-            return Math.hypot(x - (event.clientX - rect.left), y - (event.clientY - rect.top)) < PICK_RADIUS;
-          });
-          el.title = hit?.player.nick ?? t("open");
+          const hit = pickReaderGroup(groups.current, event.clientX - rect.left, event.clientY - rect.top);
+          el.title = hit ? hit.readers.length === 1 ? hit.readers[0].player.nick : t("readers", { count: hit.readers.length }) : t("open");
         } : undefined}
       />
       {target && (
         <Box
+          ref={panel}
+          role="region"
+          aria-label={target.kind === "readers" ? t("readers", { count: selected.length }) : t("gallery", { x: formatCoordinate(target.cell.x), floor: formatCoordinate(target.cell.floor) })}
+          tabIndex={-1}
           position="absolute"
-          left={`${Math.max(4, Math.min(target.x + 12, (canvas.current?.clientWidth ?? 240) - 240))}px`}
-          top={`${Math.max(4, Math.min(target.y + 12, (canvas.current?.clientHeight ?? 160) - 160))}px`}
+          left={`${Math.max(4, Math.min(target.x + 12, (canvas.current?.clientWidth ?? 300) - 300))}px`}
+          top={`${panelTop}px`}
           p={3}
           borderRadius="8px"
           bg="rgba(8,8,15,0.94)"
@@ -310,29 +350,39 @@ export default function LibraryMap({ mode, onExpand, onClose }: { mode: "mini" |
           fontSize="11px"
           color="dark.100"
           minW="220px"
+          w="300px"
           maxW="calc(100% - 8px)"
-          maxH="calc(100% - 8px)"
+          maxH={`calc(100% - ${panelTop + 4}px)`}
           overflowY="auto"
         >
-          {target.kind === "player" && <Text color={target.player.color}>{target.player.nick}</Text>}
-          {target.kind === "player" && <Text color="dark.300">{target.player.view.kind === "desk" ? t("reading", { wall: target.player.view.wall, shelf: target.player.view.shelf, volume: target.player.view.volume, page: target.player.view.page }) : target.player.view.kind === "shelf" ? t("atShelf", { wall: target.player.view.wall, shelf: target.player.view.shelf }) : t("walking")}</Text>}
-          {target.kind === "note" && <><Text color={target.note.color}>{target.note.nick}</Text><Text wordBreak="break-word">{target.note.text}</Text></>}
-          <Text>{t("gallery", { x: formatCoordinate(target.cell.x), floor: formatCoordinate(target.cell.floor) })}</Text>
-          <Text color="dark.300" mb={2}>
-            {explored(target.cell) ? t("explored") : t("unexplored")}
-          </Text>
-          <Flex gap={2} wrap="wrap">
-            {(target.kind === "note" || !(me && sameCell(me.cell, target.cell))) && (
-              <chakra.button onClick={() => go(target.kind === "player" ? placeHref(target.cell, target.player.view.wall) : target.kind === "note" ? noteHref(target.note) : placeHref(target.cell))} color="brand.300" cursor="pointer">
-                {target.kind === "player" ? t("goTo") : t("goHere")}
-              </chakra.button>
-            )}
-            {target.kind === "player" && target.player.view.kind !== "walk" && (
-              <chakra.button onClick={() => go(viewHref(target.cell, target.player.view))} color="brand.300" cursor="pointer">
-                {t("openBook")}
-              </chakra.button>
-            )}
+          <Flex justify="space-between" gap={3} mb={2} align="baseline">
+            {target.kind === "readers" && <Text>{t("readers", { count: selected.length })}</Text>}
+            <chakra.button ml="auto" color="brand.300" cursor="pointer" onClick={() => { setTarget(null); setReaderQuery(""); setReaderLimit(READER_PAGE_SIZE); picked.current = null; dirty.current = true; }}>{t("close")}</chakra.button>
           </Flex>
+          {target.kind === "readers" ? <>
+            <Input type="search" size="sm" mb={2} value={readerQuery} aria-label={t("searchReaders")} placeholder={t("searchReaders")} onChange={(event) => { setReaderQuery(event.target.value); setReaderLimit(READER_PAGE_SIZE); }} color="dark.100" bg="rgba(7,6,10,0.92)" borderColor="brand.300/30" />
+            <Box as="ul" m={0} p={0} listStyleType="none">
+              {matchingReaders.slice(0, readerLimit).map(({ player, cell }) => (
+                <Box as="li" key={player.id} py={2} borderTop="1px solid" borderColor="brand.300/20" overflowWrap="anywhere">
+                  <Text color={player.color}>{player.nick}</Text>
+                  <Text color="dark.300">{player.view.kind === "desk" ? t("reading", player.view) : player.view.kind === "shelf" ? t("atShelf", player.view) : t("walking")}</Text>
+                  <Text>{t("gallery", { x: formatCoordinate(cell.x), floor: formatCoordinate(cell.floor) })}</Text>
+                  <Flex gap={3} mt={1} wrap="wrap">
+                    <chakra.button onClick={() => visit(player.id, false)} color="brand.300" cursor="pointer">{t("goTo")}</chakra.button>
+                    {player.view.kind !== "walk" && <chakra.button onClick={() => visit(player.id, true)} color="brand.300" cursor="pointer">{t("openBook")}</chakra.button>}
+                  </Flex>
+                </Box>
+              ))}
+            </Box>
+            {matchingReaders.length > readerLimit && <chakra.button mt={2} onClick={() => setReaderLimit((limit) => limit + READER_PAGE_SIZE)} color="brand.300" cursor="pointer">{t("showMore")}</chakra.button>}
+          </> : <>
+            {target.kind === "note" && <><Text color={target.note.color}>{target.note.nick}</Text><Text wordBreak="break-word">{target.note.text}</Text></>}
+            <Text>{t("gallery", { x: formatCoordinate(target.cell.x), floor: formatCoordinate(target.cell.floor) })}</Text>
+            <Text color="dark.300" mb={2}>{explored(target.cell) ? t("explored") : t("unexplored")}</Text>
+            {(target.kind === "note" || !(me && sameCell(me.cell, target.cell))) && (
+              <chakra.button onClick={() => go(target.kind === "note" ? noteHref(target.note) : placeHref(target.cell))} color="brand.300" cursor="pointer">{t("goHere")}</chakra.button>
+            )}
+          </>}
         </Box>
       )}
     </Box>

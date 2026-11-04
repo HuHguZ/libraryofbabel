@@ -18,6 +18,7 @@ export class OnlineHub {
   readonly clients = new Set<Session>();
   readonly fog = new FogBook();
   readonly limits = new RateLimits();
+  private activitySequence = 0;
   private readonly pendingPlaces = new Map<string, PendingPlace>();
   private flushing: Promise<void> | null = null;
   constructor(readonly database: Storage, readonly adminToken: string, readonly bans = new Bans()) {}
@@ -25,6 +26,9 @@ export class OnlineHub {
     const session = new Session(this, guest, ip, send, close); this.clients.add(session); return session;
   }
   broadcast(lang: Locale, message: ServerMessage): void { for (const client of this.clients) client.broadcast(lang, message); }
+  activity(lang: Locale, action: "joined" | "left", nick: string): void {
+    this.broadcast(lang, { type: "activity", activity: { id: `presence:${++this.activitySequence}`, action, nick, at: new Date().toISOString() } });
+  }
   tick(): void { for (const [lang, world] of this.worlds) { const moves = world.takeMoves(); if (moves) this.broadcast(lang, moves); } }
   roster(): void { for (const [lang, world] of this.worlds) this.broadcast(lang, world.roster()); }
   remember(guest: string, lang: Locale, pose: Pose): void { this.pendingPlaces.set(`${guest} ${lang}`, { guest, lang, cell: pose.cell, wall: pose.view.wall || 1 }); }
@@ -61,7 +65,7 @@ export class Session {
     if (this.closed) return;
     const snapshot = this.snapshot;
     const buffered = snapshot?.kind === "hello"
-      ? message.type === "message" || (message.type === "forgotten" && message.kind === "chat")
+      ? message.type === "message" || message.type === "activity" || (message.type === "forgotten" && message.kind === "chat")
       : message.type === "noted" || message.type === "painted" || (message.type === "forgotten" && message.kind === "note");
     if (snapshot?.lang === lang && buffered) {
       if (snapshot.events.length >= 1024) { this.disconnect(1013); this.close(); }
@@ -118,8 +122,13 @@ export class Session {
     const world = this.hub.worlds.get(lang)!;
     if (message.type === "pose") {
       if (!this.allowed("pose", true)) return;
-      const pose: Pose = { cell: message.cell, p: message.p, yaw: message.yaw, view: message.view };
-      if (!this.joined) { this.joined = true; world.join({ id: this.guest, nick: this.nick, color: this.color, ...pose }); this.hub.broadcast(lang, world.roster()); }
+      const pose: Pose = { cell: message.cell, p: message.p, yaw: message.yaw, view: message.view, ...(message.reading && { reading: message.reading }) };
+      if (!this.joined) {
+        this.joined = true;
+        const first = world.join({ id: this.guest, nick: this.nick, color: this.color, ...pose });
+        this.hub.broadcast(lang, world.roster());
+        if (first) this.hub.activity(lang, "joined", this.nick);
+      }
       else world.move(this.guest, pose);
       this.hub.remember(this.guest, lang, pose);
       const marked = this.hub.fog.mark(lang, parseCellKey(pose.cell)!);
@@ -198,7 +207,10 @@ export class Session {
     this.closed = true; this.snapshot = null; this.hub.clients.delete(this);
     if (this.lang && this.joined) {
       const world = this.hub.worlds.get(this.lang)!;
-      if (world.leave(this.guest)) this.hub.broadcast(this.lang, { type: "left", id: this.guest });
+      if (world.leave(this.guest)) {
+        this.hub.broadcast(this.lang, { type: "left", id: this.guest });
+        this.hub.activity(this.lang, "left", this.nick);
+      }
       this.hub.broadcast(this.lang, world.roster());
     }
   }

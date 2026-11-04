@@ -20,6 +20,39 @@ describe("client protocol", () => {
     expect(parseClientMessage('{"type":"pose","cell":"0:0","p":[0,0,0],"yaw":1e999,"view":{"kind":"walk","wall":1}}')).toBeNull();
     expect(parse({ ...pose, view: { kind: "desk", wall: 4, shelf: 7, volume: 31, page: 421 } })).not.toBeNull();
   });
+  it("validates ephemeral reading metadata without changing legacy poses", () => {
+    const desk = { ...pose, view: { kind: "desk", wall: 1, shelf: 2, volume: 3, page: 4 } };
+    const fragment = { page: 421, start: 0, end: 4819, color: "#ABCDEF" };
+    const loupe = { page: 4, u: 0, v: 1, power: 6 };
+    expect(parse({ ...desk, reading: { fragment, loupe, ignored: true } })).toEqual({
+      ...desk, reading: { fragment: { ...fragment, color: "#abcdef" }, loupe },
+    });
+    expect(parse({ ...desk, reading: { loupe: { ...loupe, power: 1.5 } } })).toMatchObject({ reading: { loupe: { power: 1.5 } } });
+    expect(parse(desk)).toEqual(desk);
+  });
+  it("retains the owner's page projection and rejects malformed lens matrices", () => {
+    const desk = { ...pose, view: { kind: "desk", wall: 1, shelf: 2, volume: 3, page: 4 } };
+    const loupe = { page: 4, u: 0.5, v: 0.5, power: 3, sample: [0.1, 0, 0, 0, 0.1, 0, 0.5, 0.5, 1] };
+    expect(parse({ ...desk, reading: { loupe } })).toMatchObject({ reading: { loupe } });
+    for (const sample of [null, [], [...loupe.sample, 1], "matrix", [...loupe.sample.slice(0, 8), 0], [10001, ...loupe.sample.slice(1)], [null, ...loupe.sample.slice(1)]]) {
+      expect(parse({ ...desk, reading: { loupe: { ...loupe, sample } } })).toBeNull();
+    }
+  });
+  it("drops the entire pose for malformed reading data or reading outside a book page", () => {
+    const desk = { ...pose, view: { kind: "desk", wall: 1, shelf: 2, volume: 3, page: 4 } };
+    const fragment = { page: 4, start: 0, end: 12, color: "#abcdef" };
+    const loupe = { page: 4, u: 0.5, v: 0.5, power: 3 };
+    for (const changed of [{ page: 0 }, { page: 422 }, { start: -1 }, { end: 4820 }, { start: 12 }, { start: 0.5 }, { color: "red" }]) {
+      expect(parse({ ...desk, reading: { fragment: { ...fragment, ...changed } } })).toBeNull();
+    }
+    for (const changed of [{ page: 0 }, { page: 422 }, { u: -0.1 }, { v: 1.01 }, { power: 1.49 }, { power: 6.01 }, { power: null }]) {
+      expect(parse({ ...desk, reading: { loupe: { ...loupe, ...changed } } })).toBeNull();
+    }
+    for (const reading of [null, [], "metadata", { fragment: null }, { loupe: null }]) expect(parse({ ...desk, reading })).toBeNull();
+    expect(parse({ ...pose, reading: { fragment } })).toBeNull();
+    expect(parse({ ...desk, view: { ...desk.view, page: 0 }, reading: { loupe } })).toBeNull();
+    expect(parseClientMessage(JSON.stringify({ ...desk, reading: { loupe } }).replace('"u":0.5', '"u":1e999'))).toBeNull();
+  });
   it("deduplicates bounded watches", () => {
     expect(parse({ type: "watch", chunks: ["0:0", "-1:2", "0:0"] })).toEqual({ type: "watch", chunks: ["0:0", "-1:2"] });
     for (const chunks of [[], ["x"], Array.from({ length: 65 }, (_, i) => `${i}:0`)]) expect(parse({ type: "watch", chunks })).toBeNull();

@@ -22,6 +22,7 @@ import type { Anchor, Note } from "@/lib/online/protocol";
 import { useOnlineSelector, useOnlineStore } from "@/components/online/OnlineProvider";
 import { noteHref } from "@/components/online/teleport";
 import NoteComposer from "@/components/online/NoteComposer";
+import { liveHighlights, liveLoupes } from "@/components/online/remoteReading";
 
 const mono = "var(--font-jetbrains), monospace";
 const serif = "var(--font-cormorant), Georgia, serif";
@@ -133,6 +134,8 @@ function Reader({ address, initialQuery, initialFragment, initialNote }: { addre
   const online = useOnlineSelector((s) => s.status === "online");
   const you = useOnlineSelector(s => s.you?.id);
   const notesVersion = useOnlineSelector(s => s.notesVersion);
+  const players = useOnlineSelector(s => s.players);
+  const selectionsVersion = useOnlineSelector(s => s.selectionsVersion);
   const refused = useOnlineSelector(s => s.refused);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -145,6 +148,11 @@ function Reader({ address, initialQuery, initialFragment, initialNote }: { addre
     return onlineStore.notesAt(cell).filter(n => n.anchor?.wall === address.wall && n.anchor.shelf === address.shelf && n.anchor.volume === address.volume);
   }, [onlineStore, cell, address, notesVersion]);
   const highlights = useMemo(() => notes.map(n => ({ ...n.anchor!, color: n.highlightColor ?? n.color })), [notes]);
+  const peerDrafts = useMemo(() => {
+    void selectionsVersion; // Fragment changes invalidate the mutable presence tracks.
+    return liveHighlights(players.values(), onlineStore.tracks, cell, address, notes);
+  }, [players, onlineStore, cell, address, notes, selectionsVersion]);
+  const getLoupes = useCallback(() => liveLoupes(onlineStore.getSnapshot().players.values(), onlineStore.tracks, cell, address), [onlineStore, cell, address]);
   const rawMark = shownFragment(fragments);
   const savedNote = notes.find(n => n.id === selectedId && sameFragment(n.anchor, rawMark)) ?? notes.find(n => n.author === you && sameFragment(n.anchor, rawMark));
   const marked = selectedId !== null && !savedNote && !fragments.live ? null : rawMark;
@@ -379,6 +387,8 @@ function Reader({ address, initialQuery, initialFragment, initialNote }: { addre
     mark: marked,
     markColor,
     highlights,
+    liveHighlights: peerDrafts,
+    getLoupes,
     markFocusToken: fragmentFocus.n ? String(fragmentFocus.n) : undefined,
     loupe: loupe.active,
   });
@@ -419,6 +429,7 @@ function Reader({ address, initialQuery, initialFragment, initialNote }: { addre
                 fragment={selectedId !== null && !savedNote && !fragments.live ? null : fragments.mark}
                 live={fragments.live}
                 notes={notes}
+                liveHighlights={peerDrafts}
                 savedNote={savedNote}
                 canEdit={savedNote?.author === you}
                 saving={saving}

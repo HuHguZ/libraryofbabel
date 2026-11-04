@@ -12,14 +12,18 @@ let gltf: ReturnType<typeof model>;
 let placed = { x: 0, y: 1.6, z: 0, yaw: 0, speed: 0, view: player.view };
 function model() {
   const scene = new THREE.Group();
+  const bone = new THREE.Bone(), skin = new THREE.SkinnedMesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+  skin.name = "skin"; scene.add(bone, skin); skin.bind(new THREE.Skeleton([bone]));
   const animations = ["HumanArmature|Man_Idle", "HumanArmature|Man_Walk"].map(name => new THREE.AnimationClip(name, 1, [new THREE.NumberKeyframeTrack(".position[x]", [0, 1], [0, 1])]));
   return { scene, animations };
 }
 vi.mock("@react-three/fiber", () => ({ useFrame: (callback: typeof frame) => { frame = callback; } }));
 vi.mock("@react-three/drei", () => ({ Html: () => null, useGLTF: Object.assign(() => gltf, { preload: () => {} }) }));
-vi.mock("@/components/explore/stage/StageProvider", () => ({ useStageSelector: () => true, useStageStore: () => ({ getSnapshot: () => ({ place: {} }) }) }));
+const stageSnapshot = { place: { col: 0, level: 0, cell: { x: 0n, floor: 0n } } };
+vi.mock("@/components/explore/stage/StageProvider", () => ({ useStageSelector: (select: (s: typeof stageSnapshot) => unknown) => select(stageSnapshot), useStageStore: () => ({ getSnapshot: () => stageSnapshot }) }));
 vi.mock("./OnlineProvider", () => ({ useOnlineSelector: () => players, useOnlineStore: () => ({ tracks: new Map() }) }));
 vi.mock("./presence", () => ({ placeAvatar: () => placed }));
+vi.mock("./RemoteBooks", () => ({ default: () => null }));
 
 beforeEach(() => {
   gltf = model(); placed = { x: 0, y: 1.6, z: 0, yaw: 0, speed: 0, view: player.view };
@@ -30,6 +34,20 @@ beforeEach(() => {
     if (String(args[0]).includes("non-boolean attribute") && args[2] === "visible") return;
     error(...args);
   });
+});
+it("disposes owned skeleton textures on culling without disposing the shared model geometry", () => {
+  const dispose = vi.spyOn(THREE.Skeleton.prototype, "dispose");
+  const source = gltf.scene.getObjectByName("skin") as THREE.SkinnedMesh;
+  const geometry = vi.spyOn(source.geometry, "dispose");
+  const view = render(<StrictMode><RemotePlayers /></StrictMode>);
+  expect(dispose).toHaveBeenCalled();
+  const owned = dispose.mock.contexts[0] as THREE.Skeleton;
+  expect(owned).not.toBe(source.skeleton);
+  owned.computeBoneTexture();
+  expect(owned.boneTexture).not.toBeNull();
+  view.unmount();
+  expect(owned.boneTexture).toBeNull();
+  expect(geometry).not.toHaveBeenCalled();
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 

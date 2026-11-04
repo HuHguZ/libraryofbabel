@@ -38,6 +38,16 @@ describe("poseChanged", () => {
     expect(poseChanged(a, { ...a, cell: "1:0" })).toBe(true);
     expect(poseChanged(a, { ...a, view: { kind: "walk", wall: 2 } })).toBe(true);
   });
+  it("notices live selection, colour and loupe changes and their removal", () => {
+    const reading = { fragment: { page: 4, start: 2, end: 8, color: "#abcdef" }, loupe: { page: 4, u: 0.2, v: 0.3, power: 3 } };
+    const readingPose = { ...a, view: { kind: "desk" as const, wall: 1, shelf: 2, volume: 3, page: 4 }, reading };
+    expect(poseChanged(readingPose, { ...readingPose, reading: structuredClone(reading) })).toBe(false);
+    expect(poseChanged(readingPose, { ...readingPose, reading: { ...reading, fragment: { ...reading.fragment, end: 9 } } })).toBe(true);
+    expect(poseChanged(readingPose, { ...readingPose, reading: { ...reading, fragment: { ...reading.fragment, color: "#112233" } } })).toBe(true);
+    expect(poseChanged(readingPose, { ...readingPose, reading: { ...reading, loupe: { ...reading.loupe, u: 0.25 } } })).toBe(true);
+    expect(poseChanged(readingPose, { ...readingPose, reading: { fragment: reading.fragment } })).toBe(true);
+    expect(poseChanged(readingPose, { ...readingPose, reading: undefined })).toBe(true);
+  });
 });
 
 describe("placeAvatar", () => {

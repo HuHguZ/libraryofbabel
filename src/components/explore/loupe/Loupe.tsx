@@ -9,6 +9,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { isCenterAim, setLoupeCursor } from "../cursor";
 import { createLensMaterial } from "./lensMaterial";
 import { LOUPE, formatPower, lensDiameter, lensViewOffset, targetSize, wheelPower, worldRadiusForPixels } from "./loupeMath";
+import { useStageStore } from "../stage/StageProvider";
 
 /** "Magnifying Glass 01" by Nazar Borodavka, Poly Haven (CC0): upright, the handle down, the lens facing ±z. */
 export const LOUPE_MODEL_URL = "/models/magnifying_glass_01/magnifying_glass_01_2k.gltf";
@@ -77,6 +78,13 @@ function roomEnvironment(gl: THREE.WebGLRenderer): THREE.Texture {
 }
 
 function LoupeInHand({ active, defaultPower }: { active: boolean; defaultPower: number }) {
+  const stage = useStageStore();
+  const shared = useRef<ReturnType<NonNullable<typeof stage.commands.loupePose>>>(null);
+  useEffect(() => {
+    const read = () => shared.current;
+    stage.commands.loupePose = read;
+    return () => { if (stage.commands.loupePose === read) delete stage.commands.loupePose; };
+  }, [stage]);
   const gltf = useGLTF(LOUPE_MODEL_URL, false, false);
   const gl = useThree((s) => s.gl);
   const locale = useLocale();
@@ -197,6 +205,7 @@ function LoupeInHand({ active, defaultPower }: { active: boolean; defaultPower: 
     const camera = state.camera as THREE.PerspectiveCamera;
     const captured = document.pointerLockElement === canvas || isCenterAim(canvas);
     const shown = active && camera.isPerspectiveCamera && (inside.current || captured);
+    shared.current = null;
     presence.current = THREE.MathUtils.damp(presence.current, shown ? 1 : 0, 16, step);
     if (!shown && presence.current < 0.02) {
       presence.current = 0;
@@ -219,6 +228,10 @@ function LoupeInHand({ active, defaultPower }: { active: boolean; defaultPower: 
 
     // The lens sits on the line from the eye through the pointer, facing the eye.
     camera.updateMatrixWorld();
+    if (shown) {
+      const hit = stage.commands.pageAt?.(px, py, camera, { x: diameter / width / power.current, y: diameter / height / power.current });
+      if (hit) shared.current = { ...hit, power: power.current };
+    }
     const depth = camera.near * DEPTH_IN_NEARS;
     const halfHeight = (depth * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / camera.zoom;
     point.set(px * halfHeight * camera.aspect, py * halfHeight, -depth).applyMatrix4(camera.matrixWorld);
@@ -255,12 +268,14 @@ function LoupeInHand({ active, defaultPower }: { active: boolean; defaultPower: 
     viewCamera.updateMatrixWorld();
 
     loupe.visible = false;
+    const hidden: THREE.Object3D[] = [];
+    state.scene.traverse(o => { if (o.name === "peer-loupe" && o.visible) { hidden.push(o); o.visible = false; } });
     const previous = state.gl.getRenderTarget();
-    state.gl.setRenderTarget(target);
-    state.gl.clear();
-    state.gl.render(state.scene, viewCamera);
-    state.gl.setRenderTarget(previous);
-    loupe.visible = true;
+    try {
+      state.gl.setRenderTarget(target); state.gl.clear(); state.gl.render(state.scene, viewCamera);
+    } finally {
+      state.gl.setRenderTarget(previous); loupe.visible = true; hidden.forEach(o => { o.visible = true; });
+    }
     if (labelRef.current) labelRef.current.style.visibility = "visible";
 
     const uniforms = parts.lensMaterial.uniforms;
@@ -269,7 +284,7 @@ function LoupeInHand({ active, defaultPower }: { active: boolean; defaultPower: 
   });
 
   return (
-    <group ref={group} visible={false}>
+    <group ref={group} visible={false} name="local-loupe">
       <group position={[0, -MODEL_LENS.center.y, 0]}>
         <mesh geometry={parts.frame} material={parts.frameMaterial} raycast={() => null} />
         <mesh geometry={parts.glass} material={parts.lensMaterial} raycast={() => null} />

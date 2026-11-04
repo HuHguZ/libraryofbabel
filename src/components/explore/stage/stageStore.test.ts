@@ -6,7 +6,7 @@ const desk = (over: Partial<DeskInputs> = {}): DeskInputs => ({ title: "t", spre
 describe("createStageStore", () => {
   it("starts empty", () => {
     expect(createStageStore().getSnapshot()).toEqual({
-      view: null, shelfTitles: null, desk: null, place: null, ready: false, moving: false, locked: false, origin: null,
+      view: null, shelfTitles: null, desk: null, place: null, ready: false, moving: false, locked: false, origin: null, remoteVolumes: [],
     });
   });
 

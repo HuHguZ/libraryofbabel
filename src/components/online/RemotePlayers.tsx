@@ -1,15 +1,16 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Html, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { ROOM } from "@/components/explore/geometry";
 import { useStageSelector, useStageStore } from "@/components/explore/stage/StageProvider";
-import type { Player } from "@/lib/online/protocol";
 import { useOnlineSelector, useOnlineStore } from "./OnlineProvider";
 import { placeAvatar } from "./presence";
+import RemoteBooks from "./RemoteBooks";
+import { nearbyReaders, readingPosition, type ReaderLayout } from "./remoteReading";
 
 const MODEL = "/models/reader.glb";
 /** Clip names in reader.glb (see public/models/README.md); "read" falls back to idle with the head bowed. */
@@ -24,11 +25,17 @@ const LABEL_RANGE = 14;
 
 type Clip = keyof typeof CLIPS;
 
-function Avatar({ player }: { player: Player }) {
+function Avatar({ reader }: { reader: ReaderLayout }) {
+  const { player } = reader;
   const online = useOnlineStore();
   const stage = useStageStore();
   const gltf = useGLTF(MODEL);
   const model = useMemo(() => cloneSkinned(gltf.scene), [gltf.scene]);
+  const skeletons = useMemo(() => {
+    const owned = new Set<THREE.Skeleton>();
+    model.traverse(o => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) owned.add((o as THREE.SkinnedMesh).skeleton); });
+    return owned;
+  }, [model]);
   const mixer = useMemo(() => new THREE.AnimationMixer(model), [model]);
   const actions = useMemo(() => {
     const out = {} as Record<Clip, THREE.AnimationAction>;
@@ -63,7 +70,7 @@ function Avatar({ player }: { player: Player }) {
   }, [model, player.color]);
 
   // Effect cleanup can replay while cached actions are still used; the per-avatar mixer is garbage-collected on unmount.
-  useEffect(() => () => { mixer.stopAllAction(); playing.current = null; }, [mixer]);
+  useEffect(() => () => { mixer.stopAllAction(); playing.current = null; skeletons.forEach(s => s.dispose()); }, [mixer, skeletons]);
 
   useFrame(({ camera }, dt) => {
     const g = group.current;
@@ -73,8 +80,12 @@ function Avatar({ player }: { player: Player }) {
     g.visible = placed !== null;
     if (label.current) label.current.style.display = "none";
     if (!placed) return;
-    g.position.set(placed.x, placed.y - ROOM.eyeHeight, placed.z);
-    g.rotation.y = placed.yaw + MODEL_YAW;
+    if (placed.view.kind === "desk" && reader.desk !== null) {
+      const at = readingPosition(reader);
+      g.position.set(at.x, at.y - ROOM.eyeHeight, at.z); g.rotation.y = at.yaw;
+    } else {
+      g.position.set(placed.x, placed.y - ROOM.eyeHeight, placed.z); g.rotation.y = placed.yaw + MODEL_YAW;
+    }
     const clip: Clip = placed.view.kind === "desk" ? "read" : placed.speed > 0.3 ? "walk" : "idle";
     if (clip !== playing.current) {
       if (playing.current) actions[playing.current].fadeOut(0.25);
@@ -82,13 +93,14 @@ function Avatar({ player }: { player: Player }) {
       playing.current = clip;
     }
     if (head) head.rotation.x = headX;
+    model.rotation.x = clip === "read" ? 0.08 : 0;
     mixer.update(Math.min(dt, 0.1));
     if (head && clip === "read") head.rotation.x += 0.45;
     if (label.current) label.current.style.display = camera.position.distanceTo(g.position) < LABEL_RANGE ? "block" : "none";
   });
 
   return (
-    <group ref={group} visible={false}>
+    <group ref={group} visible={false} name={`remote-player:${player.id}`}>
       <primitive object={model} scale={MODEL_SCALE} />
       <Html position={[0, ROOM.eyeHeight + 0.45, 0]} center occlude style={{ pointerEvents: "none" }}>
         <div
@@ -111,13 +123,28 @@ function Avatar({ player }: { player: Player }) {
 /** The other visitors of this Library near the visitor, as readers in their colours. */
 export default function RemotePlayers() {
   const players = useOnlineSelector((s) => s.players);
-  const ready = useStageSelector((s) => s.place !== null);
-  if (!ready) return null;
+  const place = useStageSelector((s) => s.place);
+  const online = useOnlineStore();
+  const [readers, setReaders] = useState(() => place ? nearbyReaders(players.values(), online.tracks, place) : []);
+  const seen = useRef(new Map<string, string>()), last = useRef({ at: -Infinity, signature: "" });
+  useFrame(({ clock }) => {
+    if (clock.elapsedTime - last.current.at < 0.2) return;
+    last.current.at = clock.elapsedTime;
+    const previous = seen.current, next = new Map<string, string>();
+    for (const player of players.values()) {
+      const view = online.tracks.get(player.id)?.at(-1)?.view ?? player.view;
+      next.set(player.id, view.kind === "desk" ? `${view.wall}:${view.shelf}:${view.volume}` : "");
+    }
+    const selected = place ? nearbyReaders(players.values(), online.tracks, place).map(r => ({ ...r, arrive: previous.has(r.player.id) && previous.get(r.player.id) !== next.get(r.player.id) && r.view.kind === "desk" })) : [];
+    seen.current = next;
+    const signature = selected.map(r => `${r.player.id}:${r.player.cell}:${JSON.stringify(r.view)}:${r.col}:${r.level}:${r.desk}:${r.slot}:${r.bookSlot}:${r.arrive}:${r.player.nick}:${r.player.color}`).join("|");
+    if (signature !== last.current.signature) { last.current.signature = signature; setReaders(selected); }
+  }, -1.75);
+  if (!place) return null;
   return (
     <Suspense fallback={null}>
-      {[...players.values()].map((p) => (
-        <Avatar key={p.id} player={p} />
-      ))}
+      {readers.map(reader => <Avatar key={reader.player.id} reader={reader} />)}
+      <RemoteBooks readers={readers} />
     </Suspense>
   );
 }

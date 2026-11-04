@@ -208,6 +208,7 @@
     "linkCopied": "link copied ✓",
     "clearFragment": "Clear the mark",
     "saveMark": "Save highlight",
+    "liveHighlight": "{name} is highlighting",
     "savingMark": "Saving…",
     "savedMark": "Saved for everyone",
     "shareMarkChat": "Send to chat",
@@ -236,12 +237,15 @@
     "home": "Back to the home page"
   },
   "Online": {
+    "joinReading": "Join reading",
+    "bookPage": "p. {page}",
     "online": "{count, plural, one {# reader} other {# readers}} in the Library",
     "alone": "You are alone in the Library",
     "connecting": "Connecting…",
     "offline": "A Library of your own",
     "you": "You",
     "nick": "Name",
+    "profile": "Change name",
     "save": "Save",
     "walking": "wandering · gallery {x} · floor {floor}",
     "atShelf": "at shelf {shelf} of wall {wall} · gallery {x} · floor {floor}",
@@ -261,6 +265,8 @@
     "forget": "delete"
   },
   "Chat": {
+    "joined": "{nick} joined the Library",
+    "left": "{nick} left the Library",
     "close": "Close chat",
     "open": "T — write",
     "placeholder": "A message for everyone in the Library…",
@@ -281,6 +287,9 @@
     "banConfirm": "Ban {nick}?"
   },
   "Map": {
+    "searchReaders": "Search by nickname",
+    "showMore": "Show more",
+    "readers": "Readers: {count}",
     "address": "Gallery address",
     "walking": "walking",
     "atShelf": "at shelf {shelf} of wall {wall}",

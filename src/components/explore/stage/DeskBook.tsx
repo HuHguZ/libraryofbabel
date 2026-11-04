@@ -50,6 +50,8 @@ import type { BookPose } from "./poses";
 import { useStageStore } from "./StageProvider";
 import type { BookAddress, DeskInputs } from "./stageStore";
 import { nextDryingStep, nextIndexFace, nextRiffling } from "./turnState";
+import { pageSample } from "../loupe/pageSample";
+import PagePresence from "../PagePresence";
 
 export interface DeskBookProps {
   book: BookAddress;
@@ -71,6 +73,8 @@ export interface DeskBookProps {
   spineTitle?: string;
   /** Drawn (rather than a swap's other book, waiting unseen): only this one's orbit should register itself as `state.controls`. */
   shown?: boolean;
+  /** An observer's copy never installs camera controls or page interactions. */
+  observer?: boolean;
 }
 
 /** A book in flight: the pose of the closed book's centre (null: lying on its desk) and how far its covers are open, 0 closed to 1 lying open. */
@@ -136,8 +140,8 @@ interface PageTex {
  * one group puts the book into the world (on its desk, or wherever a flight has it, its covers hinged shut), and the
  * camera logic converts between the two through `frame`.
  */
-export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, interactive, motion, orbitRef, spineTitle, shown: isShown = true }: DeskBookProps) {
-  const { title, spread, contents, query, focusToken, currentMatch, matchStep, mark, markColor, highlights, markFocusToken } = inputs;
+export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, interactive, motion, orbitRef, spineTitle, shown: isShown = true, observer = false }: DeskBookProps) {
+  const { title, spread, contents, query, focusToken, currentMatch, matchStep, mark, markColor, highlights, liveHighlights, getLoupes, markFocusToken } = inputs;
   const store = useStageStore();
   const titleText = useTitlePageText(title, book.wall, book.shelf, book.volume);
   const bookText = useTranslations("Book");
@@ -450,6 +454,7 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
   /* ── Keys: WASD glide over the pages, ↑ ↓ closer and farther, Shift speeds up, Home shows the whole book ── */
   const held = useRef(new Set<GlideKey>());
   useEffect(() => {
+    if (observer) return;
     const keys = held.current;
     const typing = (e: KeyboardEvent) => {
       const el = e.target;
@@ -487,7 +492,7 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
       window.removeEventListener("blur", release);
       keys.clear();
     };
-  }, [store]);
+  }, [store, observer]);
 
   /* ── Pointer: the pages turn in read mode; in index mode the right page is the index ── */
   const hover = useRef<"prev" | "next" | null>(null);
@@ -513,12 +518,26 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
     setCanvasCursor(gl.domElement, cell !== null);
     store.handlers.current.onHoverIndexPage?.(cell === null ? null : cell + 1);
   };
-  useEffect(() => () => setCanvasCursor(gl.domElement, false), [gl]);
+  useEffect(() => observer ? undefined : () => setCanvasCursor(gl.domElement, false), [gl, observer]);
 
   /** The index lies open and still: its numbers can be chosen. */
   const atIndex = () => live.current.mode === "index" && target.current === 0 && lying.current.left === 0 && lying.current.right === 0;
   /** Which mode the hovers were made in: a hover left over from the other mode is let go. */
   const hoverMode = useRef(mode);
+  useEffect(() => {
+    if (observer || !isShown) return;
+    const ray = new THREE.Raycaster(), pointer = new THREE.Vector2();
+    const pageAt = (x: number, y: number, source: THREE.Camera, crop?: { x: number; y: number }) => {
+      if (!live.current.controlsEnabled || !atRest() || !leftPlane.current || !rightPlane.current) return null;
+      ray.setFromCamera(pointer.set(x, y), source);
+      const hit = ray.intersectObjects([leftPlane.current, rightPlane.current], false)[0];
+      if (!hit?.uv) return null;
+      const page = hit.object === leftPlane.current ? 2 * lying.current.left : 2 * lying.current.right + 1;
+      return page >= 1 && page <= LIBRARY.pages ? { page, u: hit.uv.x, v: hit.uv.y, ...(crop && { sample: pageSample(hit.object.matrixWorld, source, PAGE.w, PAGE.d, x, y, crop) }) } : null;
+    };
+    store.commands.pageAt = pageAt;
+    return () => { if (store.commands.pageAt === pageAt) delete store.commands.pageAt; };
+  }, [observer, isShown, store]);
 
   // Development aid: the console can watch the leaves, the page textures and the view, and slow the turns down (window.__reader).
   // It is the book the reader has: published again whenever a book's controls come on, as it lands on the desk.
@@ -632,11 +651,12 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
       // The index is drawn ahead as well, so going back to it never waits for it.
       else if (index.current?.key !== indexKey()) drawIndex(indexKey());
     }
-    if (all.size > CACHE_LIMIT) {
-      const keep = new Set([...shown, ...pagesAround(goal, heading.current)]);
+    const cacheLimit = observer ? 4 : CACHE_LIMIT;
+    if (all.size > cacheLimit) {
+      const keep = new Set(observer ? shown : [...shown, ...pagesAround(goal, heading.current)]);
       const spare = [...all.keys()].filter((page) => !keep.has(page)).sort((a, b) => Math.abs(b - 2 * goal) - Math.abs(a - 2 * goal));
       for (const page of spare) {
-        if (all.size <= CACHE_LIMIT) break;
+        if (all.size <= cacheLimit) break;
         all.get(page)!.texture.dispose();
         all.delete(page);
       }
@@ -789,7 +809,7 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
 
   return (
     <>
-      <OrbitControls
+      {!observer && <OrbitControls
         ref={controlsRef}
         makeDefault={isShown}
         enabled={controlsEnabled}
@@ -815,9 +835,9 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
           focus.current.active = false;
           store.handlers.current.onInteract?.();
         }}
-      />
+      />}
 
-      <group ref={bookRef} matrixAutoUpdate={false}>
+      <group ref={bookRef} matrixAutoUpdate={false} raycast={observer ? NO_RAYCAST : undefined}>
         {/* The back half of the cover, under the right page block */}
         <mesh position={[COVER.w / 4, COVER_TOP / 2, 0]} material={cover}>
           <boxGeometry args={[COVER.w / 2, COVER_TOP, COVER.d]} />
@@ -834,23 +854,28 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
         </mesh>
         <mesh
           ref={rightPlane}
+          raycast={observer ? NO_RAYCAST : undefined}
           geometry={flatPage}
           material={paper.right}
           position={[PAGE.w / 2 + GUTTER, COVER_TOP + h0.right + PAGE_LIFT, 0]}
           onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+            if (observer) return;
             e.stopPropagation();
             if (live.current.mode === "read" && answers()) setHover("next");
           }}
           onPointerMove={(e: ThreeEvent<PointerEvent>) => {
+            if (observer) return;
             if (live.current.mode !== "index") return;
             e.stopPropagation();
             setHoveredCell(answers() && atIndex() && e.uv ? indexCellFromUv(e.uv) : null);
           }}
           onPointerOut={() => {
+            if (observer) return;
             setHover(null);
             setHoveredCell(null);
           }}
           onClick={(e: ThreeEvent<MouseEvent>) => {
+            if (observer) return;
             if (live.current.mode === "read") {
               turn(e, 1);
               return;
@@ -861,6 +886,7 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
             if (cell !== null) store.handlers.current.onClickIndexPage?.(cell + 1);
           }}
         >
+          <PagePresence page={2 * spread + 1} content={contents[2 * spread + 1] ?? ""} family={family} highlights={liveHighlights} getLoupes={getLoupes} shown={() => live.current.mode === "read" && atRest() && lying.current.right === target.current} />
           {/* The number of the index under the pointer; the pointer passes through it (it would be hit before the page, with its own uv) */}
           <mesh ref={highlight} rotation={[-Math.PI / 2, 0, 0]} visible={false} material={materials.highlight} raycast={NO_RAYCAST}>
             <planeGeometry args={[(INDEX.cellW / INDEX_CANVAS.w) * PAGE.w, (INDEX.cellH / INDEX_CANVAS.h) * PAGE.d]} />
@@ -878,16 +904,20 @@ export default function DeskBook({ book, frame, mode, inputs, controlsEnabled, i
             </mesh>
             <mesh
               ref={leftPlane}
+              raycast={observer ? NO_RAYCAST : undefined}
               geometry={flatPage}
               material={paper.left}
               position={[-PAGE.w / 2 - GUTTER, COVER_TOP + h0.left + PAGE_LIFT, 0]}
               onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+                if (observer) return;
                 e.stopPropagation();
                 if (live.current.mode === "read" && answers()) setHover("prev");
               }}
-              onPointerOut={() => setHover(null)}
-              onClick={(e: ThreeEvent<MouseEvent>) => turn(e, -1)}
-            />
+              onPointerOut={() => { if (!observer) setHover(null); }}
+              onClick={(e: ThreeEvent<MouseEvent>) => { if (!observer) turn(e, -1); }}
+            >
+              <PagePresence page={2 * spread} content={contents[2 * spread] ?? ""} family={family} highlights={liveHighlights} getLoupes={getLoupes} shown={() => live.current.mode === "read" && atRest() && lying.current.left === target.current} />
+            </mesh>
             <group ref={bookmark} position={[0, COVER_TOP + h0.left + RIBBON_LIFT, 0]}>
               <Bookmark y={0} />
             </group>

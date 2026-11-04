@@ -137,6 +137,15 @@ describe("ReaderTextPanel selection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Сохранить метку" }));
     expect(onSave).toHaveBeenCalledOnce();
   });
+  it("shows a foreign live wash and its author without treating it as an editable note", () => {
+    const onSave = vi.fn(), onChoose = vi.fn(), onDelete = vi.fn();
+    renderReader(true, { liveHighlights: [{ author: "other", nick: "Читатель", page: 9, start: 100, end: 180, color: "#123456" }], onSave, onChoose, onDelete });
+    expect(screen.getByText("Читатель выделяет")).not.toBeNull();
+    expect(pageTextElement(9)!.querySelector("mark[data-saved-colors]")?.textContent).toBe(contents[9].slice(100, 180));
+    expect(screen.queryByRole("button", { name: "Сохранить метку" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Удалить метку" })).toBeNull();
+    expect(onSave).not.toHaveBeenCalled(); expect(onChoose).not.toHaveBeenCalled(); expect(onDelete).not.toHaveBeenCalled();
+  });
 
   it("shows a foreign mark in its stored colour and offers chat without edit controls", () => {
     const anchor = { wall: 1, shelf: 3, volume: 18, page: 9, start: 100, end: 180 };

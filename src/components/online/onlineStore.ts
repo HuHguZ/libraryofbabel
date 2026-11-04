@@ -1,4 +1,4 @@
-import { MAX_FRAME, MAX_WATCH, type ChatMessage, type ClientMessage, type Note, type Player, type ServerMessage } from "@/lib/online/protocol";
+import { MAX_FRAME, MAX_WATCH, type ActivityMessage, type ChatMessage, type ClientMessage, type Note, type Player, type Pose, type ServerMessage } from "@/lib/online/protocol";
 import { fogFromBase64, setBit } from "@/lib/online/fog";
 import { cellKey, chunkKeyOf, parseCellKey, type Cell } from "@/lib/world";
 import { addSample, type Track } from "./presence";
@@ -10,8 +10,9 @@ export interface OnlineSnapshot {
   last: { cell: string; wall: number } | null;
   admin: boolean;
   players: ReadonlyMap<string, Player>;
-  messages: ChatMessage[];
+  messages: (ChatMessage | ActivityMessage)[];
   notesVersion: number;
+  selectionsVersion: number;
   refused: { reason: string; at: number } | null;
 }
 export interface OnlineStore {
@@ -30,7 +31,7 @@ export interface OnlineStore {
 }
 
 export function createOnlineStore(): OnlineStore {
-  let snapshot: OnlineSnapshot = { status: "connecting", you: null, last: null, admin: false, players: new Map(), messages: [], notesVersion: 0, refused: null };
+  let snapshot: OnlineSnapshot = { status: "connecting", you: null, last: null, admin: false, players: new Map(), messages: [], notesVersion: 0, selectionsVersion: 0, refused: null };
   const serverSnapshot = snapshot;
   const listeners = new Set<() => void>();
   const tracks = new Map<string, Track>();
@@ -42,12 +43,16 @@ export function createOnlineStore(): OnlineStore {
     snapshot = { ...snapshot, ...next };
     listeners.forEach((listener) => listener());
   };
-  const track = (id: string, pose: Pick<Player, "cell" | "p" | "yaw" | "view">, now: number) => {
+  const track = (id: string, pose: Pose, now: number): boolean => {
     const cell = parseCellKey(pose.cell);
-    if (!cell) return;
+    if (!cell) return false;
     let samples = tracks.get(id);
     if (!samples) tracks.set(id, (samples = []));
-    addSample(samples, { t: now, cell, p: pose.p, yaw: pose.yaw, view: pose.view });
+    const previous = samples.at(-1);
+    const changed = JSON.stringify(previous?.reading?.fragment) !== JSON.stringify(pose.reading?.fragment) ||
+      (!!pose.reading?.fragment && !!previous && (cellKey(previous.cell) !== pose.cell || JSON.stringify(previous.view) !== JSON.stringify(pose.view)));
+    addSample(samples, { t: now, cell, p: pose.p, yaw: pose.yaw, view: pose.view, reading: pose.reading });
+    return changed;
   };
   const store: OnlineStore = {
     getSnapshot: () => snapshot,
@@ -59,8 +64,9 @@ export function createOnlineStore(): OnlineStore {
     setStatus(status) {
       if (status === snapshot.status) return;
       if (status !== "offline") return set({ status });
+      const selectionsVersion = snapshot.selectionsVersion + ([...tracks.values()].some(samples => samples.at(-1)?.reading?.fragment) ? 1 : 0);
       tracks.clear(); chunks.clear(); notes.clear(); asked.clear();
-      set({ status, you: null, last: null, admin: false, players: new Map(), messages: [], refused: null, notesVersion: snapshot.notesVersion + 1 });
+      set({ status, you: null, last: null, admin: false, players: new Map(), messages: [], refused: null, notesVersion: snapshot.notesVersion + 1, selectionsVersion });
     },
     receive(m, now = performance.now()) {
       const me = snapshot.you?.id;
@@ -77,19 +83,27 @@ export function createOnlineStore(): OnlineStore {
         case "players": {
           const self = m.list.find((player) => player.id === me);
           const players = new Map(m.list.filter((player) => player.id !== me).map((player) => [player.id, player]));
-          for (const player of players.values()) if (!tracks.has(player.id)) track(player.id, player, now);
-          for (const id of tracks.keys()) if (!players.has(id)) tracks.delete(id);
-          set({ players, ...(self && { you: { id: self.id, nick: self.nick, color: self.color } }) });
+          let changed = false;
+          for (const player of players.values()) if (track(player.id, player, now)) changed = true;
+          for (const [id, samples] of tracks) if (!players.has(id)) {
+            if (samples.at(-1)?.reading?.fragment) changed = true;
+            tracks.delete(id);
+          }
+          set({ players, selectionsVersion: snapshot.selectionsVersion + (changed ? 1 : 0), ...(self && { you: { id: self.id, nick: self.nick, color: self.color } }) });
           return;
         }
-        case "poses":
-          for (const pose of m.list) if (pose.id !== me && snapshot.players.has(pose.id)) track(pose.id, pose, now);
+        case "poses": {
+          let changed = false;
+          for (const pose of m.list) if (pose.id !== me && snapshot.players.has(pose.id) && track(pose.id, pose, now)) changed = true;
+          if (changed) set({ selectionsVersion: snapshot.selectionsVersion + 1 });
           return;
+        }
         case "left": {
+          const changed = !!tracks.get(m.id)?.at(-1)?.reading?.fragment;
           tracks.delete(m.id);
           const players = new Map(snapshot.players);
           players.delete(m.id);
-          set({ players });
+          set({ players, selectionsVersion: snapshot.selectionsVersion + (changed ? 1 : 0) });
           return;
         }
         case "chunk":
@@ -126,6 +140,9 @@ export function createOnlineStore(): OnlineStore {
           return;
         case "message":
           set({ messages: [...snapshot.messages.filter((message) => message.id !== m.message.id), m.message].slice(-200) });
+          return;
+        case "activity":
+          set({ messages: [...snapshot.messages.filter((message) => message.id !== m.activity.id), m.activity].slice(-200) });
           return;
         case "refused":
           set({ refused: { reason: m.reason, at: now } });

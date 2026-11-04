@@ -3,12 +3,18 @@ import { LIBRARY } from "@/lib/library";
 import { cellKey, parseCellKey } from "@/lib/world";
 
 export type View = { kind: "walk"; wall: number } | { kind: "shelf"; wall: number; shelf: number } | { kind: "desk"; wall: number; shelf: number; volume: number; page: number };
-export interface Pose { cell: string; p: [number, number, number]; yaw: number; view: View }
+export type LoupeSample = [number, number, number, number, number, number, number, number, number];
+export interface Reading {
+  fragment?: { page: number; start: number; end: number; color: string };
+  loupe?: { page: number; u: number; v: number; power: number; sample?: LoupeSample };
+}
+export interface Pose { cell: string; p: [number, number, number]; yaw: number; view: View; reading?: Reading }
 export interface Player extends Pose { id: string; nick: string; color: string }
 export interface Anchor { wall: number; shelf: number; volume: number; page: number; start: number; end: number }
 export interface SharedPlace { cell: string; view: View; fragment?: { page: number; start: number; end: number }; note?: number }
 export interface Note { id: number; cell: string; anchor: Anchor | null; text: string; author: string; nick: string; color: string; highlightColor?: string; at: string }
 export interface ChatMessage { id: number; author: string; nick: string; color: string; text: string; place: SharedPlace | null; at: string }
+export interface ActivityMessage { id: string; action: "joined" | "left"; nick: string; at: string }
 export type ClientMessage =
   | { type: "hello"; lang: Locale; admin?: string }
   | ({ type: "pose" } & Pose)
@@ -29,6 +35,7 @@ export type ServerMessage =
   | { type: "fog"; key: string; bit: number }
   | { type: "history"; messages: ChatMessage[] }
   | { type: "message"; message: ChatMessage }
+  | { type: "activity"; activity: ActivityMessage }
   | { type: "noted"; note: Note }
   | { type: "painted"; id: number; color: string }
   | { type: "forgotten"; kind: "note" | "chat"; id: number }
@@ -62,6 +69,22 @@ function parseView(v: unknown): View | null {
 function parseSpan(v: unknown): SharedPlace["fragment"] | null {
   return record(v) && integer(v.page, 1, LIBRARY.pages) && integer(v.start, 0, LIBRARY.pageLength - 1) && integer(v.end, 1, LIBRARY.pageLength) && v.start < v.end ? { page: v.page, start: v.start, end: v.end } : null;
 }
+function parseReading(v: unknown, view: View): Reading | null {
+  if (!record(v) || view.kind !== "desk" || view.page === 0) return null;
+  const reading: Reading = {};
+  if (v.fragment !== undefined) {
+    const span = parseSpan(v.fragment), color = record(v.fragment) ? cleanColor(v.fragment.color) : null;
+    if (!span || !color) return null;
+    reading.fragment = { ...span, color };
+  }
+  if (v.loupe !== undefined) {
+    const loupe = v.loupe;
+    if (!record(loupe) || !integer(loupe.page, 1, LIBRARY.pages) || !finite(loupe.u, 1) || loupe.u < 0 || !finite(loupe.v, 1) || loupe.v < 0 || !finite(loupe.power, 6) || loupe.power < 1.5) return null;
+    if (loupe.sample !== undefined && (!Array.isArray(loupe.sample) || loupe.sample.length !== 9 || !loupe.sample.every(n => finite(n, 10000)) || loupe.sample[8] !== 1)) return null;
+    reading.loupe = { page: loupe.page, u: loupe.u, v: loupe.v, power: loupe.power, ...(loupe.sample !== undefined && { sample: [...loupe.sample as LoupeSample] as LoupeSample }) };
+  }
+  return reading;
+}
 function parseAnchor(v: unknown): Anchor | null {
   const span = parseSpan(v);
   return span && record(v) && integer(v.wall, 1, LIBRARY.walls) && integer(v.shelf, 1, LIBRARY.shelves) && integer(v.volume, 1, LIBRARY.volumes) ? { wall: v.wall, shelf: v.shelf, volume: v.volume, ...span } : null;
@@ -87,7 +110,9 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     case "pose": {
       const view = parseView(o.view);
       if (!cell(o.cell) || !view || !finite(o.yaw, 10) || !Array.isArray(o.p) || o.p.length !== 3 || !o.p.every(v => finite(v, 50))) return null;
-      return { type: "pose", cell: canonicalCell(o.cell), p: [o.p[0], o.p[1], o.p[2]], yaw: o.yaw, view };
+      const reading = o.reading === undefined ? undefined : parseReading(o.reading, view);
+      if (reading === null) return null;
+      return { type: "pose", cell: canonicalCell(o.cell), p: [o.p[0], o.p[1], o.p[2]], yaw: o.yaw, view, ...(reading && { reading }) };
     }
     case "profile": {
       const nick = o.nick === undefined ? undefined : cleanNick(o.nick);
