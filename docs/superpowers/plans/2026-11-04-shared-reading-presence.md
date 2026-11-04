@@ -21,8 +21,10 @@ Live highlights use instanced page bands rather than redrawing large text textur
 - [x] Verify the actual shared loupe model and exact examined crop in two browser clients.
 - [x] Run full tests against an isolated database, lint, typecheck and build; verify live observers, reader transitions and crowd bounds.
 - [x] Review the combined change and correct page-hit ownership, returning-book desk limits and skeleton cleanup.
-- [ ] Update the native Full HD demo, commit/push and leave local services running.
+- [x] Update the native Full HD demo, commit/push and leave local services running.
 
 Hardware performance claims are limited to measured browser checks; no public deployment or sustained real-user load is implied.
 
 Verified on 2026-11-04: 52 test files / 367 tests pass, including PostgreSQL/WebSocket integration against an isolated database; lint, typecheck and production build pass. Two independent browser guests confirmed take/page motion, independent Join navigation, live draft replacement/removal, matching lens matrices and text, and system join/leave messages. A real oblique-camera regression also caught and fixed non-canonical floating-point matrix normalization. Peer loupes do not include separate annotation meshes or scenery beyond the source page edge.
+
+The updated demo includes 20 feature chapters plus intro/outro: 156.47 seconds, native 1920×1080 capture, 30 fps, H.264 High / FFmpeg CRF 14, 101,289,194 bytes. Full decode and chapter frame review pass; both README files render a native video with controls through GitHub's Markdown API. Release asset SHA-256: `4b1e1f919286e476edd8ba34ee0634f9884da32c794dae1d59a727340b7f7e1d`. Desktop and emulated 390-pixel layouts have no horizontal overflow. The isolated test database was removed; normal local web, online server and database remain running.

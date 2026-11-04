@@ -37,11 +37,11 @@ The Library speaks **two languages**. The `RU | EN` switch in the header changes
 
 ## Online demo
 
-https://github.com/user-attachments/assets/2654fba6-6eb8-42eb-9dac-582f52369a41
+https://github.com/user-attachments/assets/10879b0e-0abd-40df-a620-3d433d30a0d2
 
 **2:36 · Full HD · 30 fps** · [Download the original](https://github.com/HuHguZ/libraryofbabel/releases/download/online-demo-2026-11-04/Library-of-Babel-Online-1080p.mp4)
 
-Live players, chat, a shared map and notes. Saved highlights appear for everyone reading the same book; colour changes arrive instantly, and chat links take readers straight to a discovery. The demo uses the Russian interface.
+Live players, shared chat and a map. Other readers see books fly onto desks, pages turn, draft selections and the original 3D loupe examining the same text at the owner's magnification. Join a reader, save a shared highlight and send the discovery to chat. The demo uses the Russian interface.
 
 ## A walk
 
@@ -248,11 +248,15 @@ npm run dev      # Next.js: localhost:3000
 
 Behind a proxy, set `NEXT_PUBLIC_WS_URL` (`wss://` for HTTPS). Enable `TRUST_PROXY=1` only behind a trusted proxy that overwrites X-Forwarded-For. A signed httpOnly cookie identifies guests; the panel lets them change nickname and clothing colour. Returning readers resume in their last gallery, newcomers arrive near the centre. Other readers appear in the world and roster with their current book and page.
 
-The minimap shows shared exploration. `M` opens the full map: drag to pan, wheel to zoom, click a gallery, reader or note to teleport. Coordinates and “To the centre” are in the HUD. Exploration is stored in 32×32 gallery chunks.
+The minimap shows shared exploration. `M` opens the full map: drag to pan, wheel to zoom, click a gallery, reader or note to teleport. Nearby reader markers form counted groups with nickname search and paginated lists. Coordinates and “To the centre” are in the HUD. Exploration is stored in 32×32 gallery chunks.
+
+“Change name” opens the name and clothing colour controls. Chat announces readers joining and their last tab disconnecting. Nearby readers have visible books and turning pages; “Join reading” opens their current spread, then each reader navigates independently. Rendering is limited to 24 nearby avatars and eight books, at most two books per desk; everyone remains accessible through the map and roster.
 
 `T` opens chat; `Enter` sends and `Esc` closes. “Share place” attaches the gallery, book and selected fragment as a clickable destination. Recent messages fade after 10 seconds; the last 200 are kept. Leave a gallery note from the HUD or a fragment note from the reader's text panel. Notes appear in lists, on the map, as book ribbons and as a sheet beside the door.
 
-In the text panel, “Save highlight” stores the selection and its colour in Postgres. Every reader in the same language world sees highlights in the text and 3D book on opening an ordinary page. Buttons with author names select saved highlights; “Send to chat” shares a link to the stored entry. Only its author can recolour or delete it, and everyone sees the change immediately. Authorship belongs to the browser's guest cookie: clearing it creates a new guest without editing rights to older highlights. Unsaved selections stay personal.
+In the text panel, “Save highlight” stores the selection and its colour in Postgres. Every reader in the same language world sees highlights in the text and 3D book on opening an ordinary page. Buttons with author names select saved highlights; “Send to chat” shares a link to the stored entry. Only its author can recolour or delete it, and everyone sees the change immediately. Authorship belongs to the browser's guest cookie: clearing it creates a new guest without editing rights to older highlights.
+
+Unsaved selections and their removal are visible live without database writes. Other readers of the same page see the original 3D loupe, its movement and the owner's examined area and magnification. Sharing page coordinates keeps the text under the glass independent of the observer's camera angle. The lens samples that sheet's texture; separate highlight overlays and scenery beyond its edge are not included.
 
 Chat and notes accept up to 300 characters. Chat allows one message per two seconds with a burst of five; notes with comments allow ten per hour with a burst of three; highlights without comments allow one per second with a burst of ten. Limits apply to both guest and IP. Authors delete their own entries. `/admin <token>` (`ADMIN_TOKEN`) enables deleting messages and gallery notes, and banning guests/IPs; only authors can edit or delete book highlights. The token stays in this browser's localStorage and never goes into public chat.
 
